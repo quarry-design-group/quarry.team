@@ -1,0 +1,96 @@
+# The CSP is strict: no 'unsafe-inline' anywhere. The line below is a TEMPLATE:
+# at build (apps/web/scripts/inject-csp-hashes.mjs, run in `postbuild`;
+# ADR-0015) the __CSP_SCRIPT_HASHES__/__CSP_STYLE_HASHES__ tokens are filled
+# with the SHA-256 hashes of the site's inline <script>/<style> content and the
+# policy is expanded into OVERLAP-FREE per-route-family rules appended to the
+# built copy — Cloudflare caps _headers lines at 2000 chars (a global union
+# exceeds it), and the production pipeline does not reliably honor `!` header
+# detach, so /* carries no CSP in the built file and every HTML route matches
+# exactly one generated rule. Unmatched paths serve 404.html, which gets a
+# <meta> CSP injected for exactly that case.
+# At serve time the Worker entry (src/worker.ts) adds a per-request 'nonce-…'
+# to script-src of every HTML response so the bot-detection bootstrap that
+# Cloudflare injects at the edge — unhashable, its body carries the ray id —
+# runs under this policy (ADR-0019). The nonce never appears in this file or
+# in the built copy.
+# Style *attributes* would need CSP's 'unsafe-hashes' weakening — components
+# use generated per-instance style blocks instead (src/lib/style-scope.ts).
+# Two static style hashes are pinned here rather than by the build: cobe 2.0.1
+# (the /team globe) injects a constant `:root{}` <style> at runtime for its
+# anchor-positioning feature, and its textContent re-writes pass through an
+# empty state that CSP checks separately (verified by instrumenting the
+# element). sha256-h3GYPBFE… is ':root{}'; sha256-47DEQpj8… is the empty
+# string — an empty stylesheet styles nothing, and mutating it afterward is
+# CSSOM, which script-src already gates. A cobe upgrade that changes either
+# trips the e2e CSP gate. Edit the tokens or directives here, never the built
+# copy.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Content-Security-Policy: default-src 'self'; object-src 'none'; img-src 'self' data:; style-src 'self' __CSP_STYLE_HASHES__ 'sha256-h3GYPBFE6Av6zUWOZYeC83lN95g5tnhsj1pyM3woz/c=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; script-src 'self' __CSP_SCRIPT_HASHES__ https://challenges.cloudflare.com https://static.cloudflareinsights.com; frame-src https://challenges.cloudflare.com https://calendly.com; connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+
+# THIS FILE IS THE SITE'S ONLY CACHE PLANE. The site is a Worker with Static
+# Assets, and zone cache configuration (Cache Rules, Page Rules, cache level)
+# has no effect on Worker responses — https://developers.cloudflare.com/workers/cache/.
+# A Terraform cache ruleset used to sit alongside this file claiming to state
+# "the same policy at the edge"; it never applied and was retired (ADR-0008).
+# Anything not given a Cache-Control here gets the Workers Static Assets
+# default, `public, max-age=0, must-revalidate`.
+#
+# Immutable hashed assets — cache hard. /_astro/ is the only content-hashed
+# prefix this site serves; webfonts land there too (Fontsource CSS imports,
+# with assetsInlineLimit forced off for woff2/ttf/otf in astro.config.mjs), so
+# there is no /fonts/ prefix to declare.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Brand imagery and icons — stable URLs whose BYTES change (a client logo
+# swapped, an OG card re-cut). Content hashing is not an option for these: the
+# URLs are referenced from meta tags, the webmanifest and by external scrapers,
+# so they have to stay stable. Without a rule here they fall to the Workers
+# Static Assets default, `max-age=0, must-revalidate`, which costs a blocking
+# revalidation round-trip on every visit for files that change about never.
+#
+# `stale-while-revalidate` is the lever that matters: a repeat visit inside the
+# SWR window is served straight from cache with no blocking request while the
+# refresh happens in the background. That lets max-age stay SHORT, so a
+# corrected asset converges quickly, without paying for it on every page load.
+# Safari does not implement SWR (Chrome, Edge and Firefox do) and simply falls
+# back to max-age plus a conditional request — still better than revalidating
+# every time.
+#
+# Client logos get the shortest window on purpose: "take our logo down" is a
+# request that should take effect in about an hour, not next week.
+/logos/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/og/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+# Icons change essentially only on a rebrand, and favicon.svg is fetched per
+# tab — the one case here where the round-trip is actually frequent.
+/favicon.svg
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/icon-192.png
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/icon-512.png
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# The legacy-SW kill-switch must never be cached — every update check has to
+# see the live copy so future edits (or removal) propagate immediately.
+/service-worker.js
+  Cache-Control: no-store
+
+# Plain-text files: declare the charset explicitly — with `nosniff` set and no
+# charset, browsers fall back to Latin-1 and any UTF-8 byte renders as mojibake.
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+/robots.txt
+  Content-Type: text/plain; charset=utf-8
+/.well-known/security.txt
+  Content-Type: text/plain; charset=utf-8

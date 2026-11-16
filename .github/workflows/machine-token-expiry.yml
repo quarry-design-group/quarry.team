@@ -1,0 +1,135 @@
+name: Machine token expiry
+
+# The `quarry-ci-cd` machine account's fine-grained tokens expire within a
+# year, so expiry is watched on a daily schedule, independent of use. (GitHub
+# App credentials, such as the Terraform App's key, carry no expiry and are not
+# listed.) Every day, for each
+# token, one authenticated call reads the github-authentication-token-expiration
+# header; once ROTATION_WARN_DAYS remain, or when the secret is unset or
+# rejected, the job opens a `maintenance` issue naming the token. An unset or
+# rejected token also fails the run.
+#
+# Idempotent: one open issue per token, matched by exact title against the live
+# issue list, and one run per token at a time (per-token concurrency group), so
+# later runs find the open issue and leave it alone.
+#
+#   DEPENDABOT_NUDGE_TOKEN     — Dependabot auto-merge `nudge` (ADR 0018). A user
+#                                token by necessity: Dependabot takes comment
+#                                commands only from a user with push access.
+
+on:
+  schedule:
+    - cron: '41 13 * * *' # daily
+  workflow_dispatch:
+    inputs:
+      rotation_warn_days:
+        description: Days before expiry that open the rotation issue (a value above a token's remaining days exercises the rotation path)
+        type: string
+        default: '30'
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    name: ${{ matrix.token }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - token: DEPENDABOT_NUDGE_TOKEN
+            purpose: lets the Dependabot auto-merge workflow post `@dependabot rebase` on armed PRs that are behind `main` (ADR 0018)
+            permission: 'Pull requests: Read and write'
+            workflow: dependabot-automerge.yml
+    concurrency:
+      group: machine-token-expiry-${{ matrix.token }}
+      cancel-in-progress: false
+    permissions:
+      issues: write
+    env:
+      TOKEN_NAME: ${{ matrix.token }}
+      ROTATION_ISSUE_TITLE: Rotate ${{ matrix.token }} before it expires
+      ROTATION_WARN_DAYS: ${{ inputs.rotation_warn_days || '30' }}
+    steps:
+      - name: Read the token's expiry
+        id: token
+        env:
+          TOKEN: ${{ secrets[matrix.token] }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::$TOKEN_NAME is not set"
+            echo "state=missing" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Every authenticated call answers with the token's expiry in the
+          # github-authentication-token-expiration header; an expired or
+          # revoked token answers 401.
+          headers=$(curl -sS -D - -o /dev/null \
+                      -H "Authorization: Bearer $TOKEN" \
+                      -H "X-GitHub-Api-Version: 2022-11-28" \
+                      https://api.github.com/user || true)
+          status=$(awk 'NR==1 {print $2}' <<<"$headers")
+          if [ "$status" != "200" ]; then
+            echo "::error::$TOKEN_NAME is rejected by the API (HTTP $status)"
+            echo "state=invalid" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          expiry=$(awk 'tolower($1) == "github-authentication-token-expiration:" { sub(/^[^:]*: */, ""); print }' <<<"$headers" | tr -d '\r')
+          if [ -z "$expiry" ]; then
+            echo "$TOKEN_NAME carries no expiry"
+            echo "state=ok" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          days=$(( ( $(date -u -d "$expiry" +%s) - $(date -u +%s) ) / 86400 ))
+          echo "$TOKEN_NAME expires $expiry ($days days from now)"
+          {
+            echo "expiry=$expiry"
+            echo "days=$days"
+            if [ "$days" -le "$ROTATION_WARN_DAYS" ]; then echo "state=expiring"; else echo "state=ok"; fi
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open the rotation issue
+        if: steps.token.outputs.state != 'ok'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          STATE: ${{ steps.token.outputs.state }}
+          EXPIRY: ${{ steps.token.outputs.expiry }}
+          DAYS: ${{ steps.token.outputs.days }}
+          PURPOSE: ${{ matrix.purpose }}
+          PERMISSION: ${{ matrix.permission }}
+          USED_BY: ${{ matrix.workflow }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # One open issue per token, matched by exact title against the live
+          # issue list (consistent the moment an issue is created), so every
+          # later run finds it and leaves it alone.
+          existing=$(gh issue list --repo "$REPO" --state open --label maintenance \
+                       --limit 100 --json number,title \
+                     | jq -r --arg t "$ROTATION_ISSUE_TITLE" 'map(select(.title == $t))[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "rotation issue #$existing is already open"
+            exit 0
+          fi
+          case "$STATE" in
+            expiring) lede="\`$TOKEN_NAME\` expires on $EXPIRY, $DAYS days from now." ;;
+            missing)  lede="\`$TOKEN_NAME\` is not set as a repository secret." ;;
+            *)        lede="\`$TOKEN_NAME\` is rejected by the GitHub API." ;;
+          esac
+          cat > body.md <<EOF
+          $lede
+
+          The secret holds a \`quarry-ci-cd\` machine account fine-grained token (only this repository, permission **$PERMISSION**), which $PURPOSE. Mint the replacement as described in [the bootstrap runbook](https://github.com/$REPO/blob/main/docs/runbooks/bootstrap.md#1-create-the-repository-secrets), store the token and its expiry in Passbolt next to the account, then update the repository secret:
+
+              gh secret set $TOKEN_NAME --repo $REPO
+
+          Used by [\`$USED_BY\`](https://github.com/$REPO/actions/workflows/$USED_BY). Close this issue once the next run of [Machine token expiry](https://github.com/$REPO/actions/workflows/machine-token-expiry.yml) reports the new expiry. Opened by [this run]($RUN_URL).
+          EOF
+          gh issue create --repo "$REPO" --title "$ROTATION_ISSUE_TITLE" --label maintenance --body-file body.md
+
+      - name: Fail while the token is unset or rejected
+        if: steps.token.outputs.state == 'missing' || steps.token.outputs.state == 'invalid'
+        run: |
+          echo "::error::$TOKEN_NAME must be replaced; the rotation issue has the steps."
+          exit 1

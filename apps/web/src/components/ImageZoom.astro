@@ -1,0 +1,243 @@
+---
+/**
+ * ImageZoom — click-to-enlarge for long-form images (case studies). Renders one
+ * shared modal <dialog>; a small script upgrades each eligible image inside a
+ * `[data-zoom-scope]` container into a button that opens it there, fitted to the
+ * screen, with an actual-size mode the reader can pan and a link to the file.
+ *
+ * Progressive enhancement: without JavaScript the images render exactly as
+ * before, and nothing here is interactive until the script has wired it. The
+ * dialog is native (`showModal`), so focus is trapped and restored, Escape
+ * closes it, and the page behind is inert.
+ *
+ * Eligible: an image with alt text (decorative images are skipped), not already
+ * inside a link or a Motion figure, whose source is meaningfully larger than its
+ * rendered size, so enlarging it shows more detail rather than a blurrier copy.
+ * An image may name a larger source than the one it renders with
+ * `data-zoom-src` + `data-zoom-width` (the case hero does: it renders at up to
+ * 1240px but its file is wider).
+ *
+ * Usage: place <ImageZoom /> once on the page and mark the containers whose
+ * images should enlarge with `data-zoom-scope`.
+ */
+---
+
+<dialog
+  data-zoom-dialog
+  aria-label="Enlarged image"
+  class="m-0 h-dvh max-h-none w-screen max-w-none border-0 p-0 text-stone-25"
+>
+  <div class="flex h-full flex-col">
+    <div class="flex flex-none items-center justify-end gap-2 p-3">
+      <button type="button" class="zoom-control" data-zoom-mode aria-pressed="false">
+        Actual size
+      </button>
+      <a class="zoom-control" data-zoom-open href="#" target="_blank" rel="noopener">
+        Open file<span class="sr-only"> (opens in a new tab)</span>
+      </a>
+      <button type="button" class="zoom-control" data-zoom-close>
+        Close
+      </button>
+    </div>
+    <div class="min-h-0 flex-1" data-zoom-stage>
+      <img data-zoom-img alt="" decoding="async" />
+    </div>
+  </div>
+</dialog>
+
+<style>
+  /* Residual: the dialog chrome, its backdrop, and the fit/actual-size stage
+     are states of elements the script creates or toggles. */
+  /* The dim layer is the full-screen dialog itself: ::backdrop does not reliably
+     see the page's custom properties, so a token there can silently fall back to
+     the browser's faint default. */
+  [data-zoom-dialog] {
+    background: var(--stone-950);
+  }
+  [data-zoom-dialog]::backdrop {
+    background: transparent;
+  }
+  :global(html:has(dialog[data-zoom-dialog][open])) {
+    overflow: hidden;
+  }
+  .zoom-control {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+    padding-inline: var(--space-4);
+    border: 1px solid var(--stone-700);
+    border-radius: var(--radius-full);
+    background: var(--stone-900);
+    color: var(--stone-25);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .zoom-control:hover {
+    border-color: var(--stone-500);
+  }
+  .zoom-control:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  [data-zoom-stage] {
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    padding: 0 var(--space-4) var(--space-4);
+  }
+  [data-zoom-img] {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: var(--radius-lg);
+    cursor: zoom-in;
+  }
+  /* Actual size: the image at its file's pixel size, panned by scrolling. */
+  [data-zoom-stage][data-actual] {
+    display: block;
+    overflow: auto;
+  }
+  [data-zoom-stage][data-actual] [data-zoom-img] {
+    max-width: none;
+    max-height: none;
+    margin: auto;
+    cursor: zoom-out;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    [data-zoom-dialog][open] {
+      animation: zoom-in var(--dur-2) var(--ease-out);
+    }
+    @keyframes zoom-in {
+      from {
+        opacity: 0;
+      }
+    }
+  }
+
+  /* The trigger the script wraps around each eligible image: it must not change
+     the image's layout, only add the affordance. */
+  :global(.zoom-trigger) {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: zoom-in;
+    border-radius: var(--radius-lg);
+  }
+  :global(.zoom-trigger:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+  }
+  :global(.zoom-trigger .zoom-badge) {
+    position: absolute;
+    right: var(--space-3);
+    bottom: var(--space-3);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--stone-700);
+    border-radius: var(--radius-full);
+    background: var(--stone-900);
+    color: var(--stone-25);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+  :global(.zoom-trigger:is(:hover, :focus-visible) .zoom-badge) {
+    opacity: 1;
+    border-color: var(--stone-500);
+  }
+</style>
+
+<script>
+  const dialog = document.querySelector<HTMLDialogElement>('[data-zoom-dialog]');
+  const stage = dialog?.querySelector<HTMLElement>('[data-zoom-stage]');
+  const big = dialog?.querySelector<HTMLImageElement>('[data-zoom-img]');
+  const mode = dialog?.querySelector<HTMLButtonElement>('[data-zoom-mode]');
+  const open = dialog?.querySelector<HTMLAnchorElement>('[data-zoom-open]');
+  const close = dialog?.querySelector<HTMLButtonElement>('[data-zoom-close]');
+
+  if (dialog && stage && big && mode && open && close && 'showModal' in dialog) {
+    /** Enlarging must show more detail: the file is at least this much wider than the slot. */
+    const MIN_GAIN = 1.25;
+
+    const setActual = (actual: boolean, at?: { x: number; y: number }) => {
+      stage.toggleAttribute('data-actual', actual);
+      mode.setAttribute('aria-pressed', String(actual));
+      mode.textContent = actual ? 'Fit to screen' : 'Actual size';
+      if (actual) {
+        // Keep the point the reader clicked under the pointer, or start centred.
+        const fx = at?.x ?? 0.5;
+        const fy = at?.y ?? 0.5;
+        stage.scrollLeft = fx * stage.scrollWidth - stage.clientWidth / 2;
+        stage.scrollTop = fy * stage.scrollHeight - stage.clientHeight / 2;
+      }
+    };
+
+    const show = (img: HTMLImageElement) => {
+      const src = img.dataset.zoomSrc || img.currentSrc || img.getAttribute('src') || '';
+      big.src = src;
+      big.alt = img.alt;
+      big.width = Number(img.dataset.zoomWidth ?? img.getAttribute('width')) || img.naturalWidth;
+      big.height = Math.round(
+        (big.width * (Number(img.getAttribute('height')) || img.naturalHeight)) /
+          (Number(img.getAttribute('width')) || img.naturalWidth),
+      );
+      open.href = src;
+      setActual(false);
+      dialog.showModal();
+    };
+
+    for (const img of document.querySelectorAll<HTMLImageElement>('[data-zoom-scope] img')) {
+      if (!img.alt.trim()) continue; // decorative
+      if (img.closest('a, button, [data-motion]')) continue;
+      const fileWidth = Number(img.dataset.zoomWidth ?? img.getAttribute('width'));
+      if (!fileWidth || fileWidth < img.clientWidth * MIN_GAIN) continue;
+
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'zoom-trigger';
+      trigger.setAttribute('aria-haspopup', 'dialog');
+      img.replaceWith(trigger);
+      trigger.append(img);
+      const badge = document.createElement('span');
+      badge.className = 'zoom-badge';
+      badge.innerHTML =
+        '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14M7 5v4M5 7h4"/></svg>';
+      const label = document.createElement('span');
+      label.textContent = 'Enlarge';
+      badge.append(label);
+      trigger.append(badge);
+      trigger.addEventListener('click', () => show(img));
+    }
+
+    mode.addEventListener('click', () => setActual(!stage.hasAttribute('data-actual')));
+    big.addEventListener('click', (event) => {
+      const box = big.getBoundingClientRect();
+      setActual(!stage.hasAttribute('data-actual'), {
+        x: (event.clientX - box.left) / box.width,
+        y: (event.clientY - box.top) / box.height,
+      });
+    });
+    close.addEventListener('click', () => dialog.close());
+    // A click on the backdrop (the dialog itself, outside its content) closes it.
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog || event.target === stage) dialog.close();
+    });
+    dialog.addEventListener('close', () => {
+      big.removeAttribute('src');
+      stage.removeAttribute('data-actual');
+    });
+  }
+</script>

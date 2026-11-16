@@ -1,0 +1,93 @@
+---
+/**
+ * ScrollTable — wraps a markdown table in MDX content so a wide table scrolls
+ * inside its own box instead of pushing the page sideways on narrow screens.
+ * The wrapper is a labelled region; a `wide` one is also keyboard-focusable
+ * so keyboard users can scroll it too (WCAG 2.1.1; axe
+ * `scrollable-region-focusable`). Without `wide` the table fits the reading
+ * column and wraps instead — it never scrolls, so it takes no tab stop. The
+ * table itself keeps native table semantics — no `display: block` on <table>.
+ *
+ * Usage (blank lines around the markdown table are required):
+ *   <ScrollTable label="Emissions boundary">
+ *
+ *   | A | B |
+ *   | - | - |
+ *
+ *   </ScrollTable>
+ */
+interface Props {
+  /** Accessible name for the scroll region; usually the table's subject. */
+  label: string;
+  /**
+   * Break out of the reading measure to the site container width, centred on
+   * the text column, so a many-column table wraps its cells sensibly. Below
+   * the container width it tracks the viewport gutters, never the page edge,
+   * and below 40rem it scrolls. Without it the table fits the column.
+   */
+  wide?: boolean;
+}
+const { label, wide = false } = Astro.props;
+---
+
+<div
+  class:list={['scroll-table', { 'scroll-table--wide': wide }]}
+  role="region"
+  aria-label={label}
+  tabindex={wide ? 0 : undefined}
+>
+  <slot />
+</div>
+
+<style>
+  .scroll-table {
+    overflow-x: auto;
+    margin-block: var(--space-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  /* Mirrors the `container` utility's gutters (space-5, then space-6 from
+     48rem) so the breakout lines up with the page shell, never the edge. */
+  .scroll-table--wide {
+    --gutter: var(--space-5);
+    --breakout: max(100%, min(var(--container) - 2 * var(--gutter), 100vw - 2 * var(--gutter)));
+    width: var(--breakout);
+    margin-inline: calc((100% - var(--breakout)) / 2);
+  }
+  @media (min-width: 48rem) {
+    .scroll-table--wide {
+      --gutter: var(--space-6);
+    }
+  }
+  .scroll-table :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+  /* Only a wide table holds a floor and scrolls below it; a column table
+     wraps to fit. A URL is the unspaced token that could still force it
+     wider, so links break anywhere. Prose keeps normal wrapping: `anywhere`
+     on whole cells would also split `&nbsp;`-bound labels and let the
+     layout crush a column to a few characters. */
+  .scroll-table--wide :global(table) {
+    min-width: 40rem;
+  }
+  .scroll-table :global(th),
+  .scroll-table :global(td) {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    vertical-align: top;
+  }
+  .scroll-table:not(.scroll-table--wide) :global(:is(th, td) a) {
+    overflow-wrap: anywhere;
+  }
+  .scroll-table :global(thead th) {
+    background: var(--color-surface-2);
+    border-bottom: 1px solid var(--color-border-strong);
+    font-weight: 600;
+  }
+  .scroll-table :global(tbody tr + tr) {
+    border-top: 1px solid var(--color-border);
+  }
+</style>

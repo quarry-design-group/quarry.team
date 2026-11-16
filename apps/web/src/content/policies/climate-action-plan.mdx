@@ -1,0 +1,160 @@
+---
+title: 'Climate Action Plan'
+summary: 'How Quarry measures, reduces, and reports its greenhouse gas emissions: a 2026 baseline, a Scope 3 focus, reduction targets, and efficient software by default.'
+category: governance
+updated: 2026-10-03
+owner: 'Managing Member'
+order: 3
+---
+
+import ScrollTable from '@/components/ScrollTable.astro';
+
+**Status:** Version 1.0, accepted October 3, 2026. Reviewed at the annual executive review on December 1, 2026, then annually.
+
+## Purpose and scope
+
+This plan sets out how Quarry Design Group, LLC (DBA Quarry, “the Company”) understands, measures, reduces, and reports the greenhouse gas (GHG) emissions associated with its business. It applies to all Company operations, the software Quarry crafts for clients, and the vendors Quarry relies on to run the business.
+
+The plan supports the Climate Action impact topic of the B Lab Standards and gives the Company a working structure for climate action that fits its size and operating model. It is a living document maintained by the Managing Member.
+
+## Commitment
+
+Quarry exists to build software that respects the humans on both sides of the screen. Climate action extends that purpose: software should respect the planet those humans live on.
+
+The Company commits to:
+
+- Measure its GHG footprint annually, starting with a 2026 baseline, and publish the results internally and externally as required.
+- Reduce absolute emissions and emissions intensity over time, prioritizing real reductions over offsets.
+- Craft software that is efficient by default: fast, lightweight, and respectful of the energy and devices it runs on.
+- Choose vendors that measure and reduce their own emissions, and use that as a factor in purchasing decisions.
+- Review this plan at least annually at the executive review and update targets as data improves.
+
+## Operating profile
+
+Quarry’s climate footprint is shaped by how it works:
+
+- **No owned or leased facilities.** Quarry is fully distributed. Workers operate from home offices across multiple countries. There are no Company-controlled buildings, vehicles, or on-site equipment.
+- **Software is the product.** Quarry’s output is strategy, design, engineering, and data work delivered through cloud infrastructure, SaaS tools, and client-owned systems.
+- **Minimal travel.** Collaboration happens remotely. Business travel is rare and discretionary.
+- **Vendor-dependent infrastructure.** Hosting, compute, collaboration tools, and AI services are purchased from vendors rather than operated in-house.
+
+The practical result: Scope 1 and Scope 2 emissions are close to zero, and nearly all of Quarry’s footprint sits in Scope 3. This plan concentrates effort where the emissions are.
+
+## Emissions boundary and inventory approach
+
+Quarry follows the [GHG Protocol Corporate Standard](https://ghgprotocol.org/corporate-standard) with an operational control boundary. The inventory covers the categories below. Categories marked “material” are measured and tracked. Categories marked “screened” are estimated once to confirm they are small, then reviewed every three years.
+
+<ScrollTable label="Emissions boundary and inventory approach" wide>
+
+| Scope        | Category                                           | Quarry source                                                                                 | Treatment                                        | Method                                                                                                                                                                            |
+| ------------ | -------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope&nbsp;1 | Direct emissions                                   | None. No owned facilities, vehicles, or fuel use.                                             | Reported as zero                                 | Confirm annually                                                                                                                                                                  |
+| Scope&nbsp;2 | Purchased electricity                              | None. No Company-controlled premises.                                                         | Reported as zero                                 | Confirm annually                                                                                                                                                                  |
+| Scope&nbsp;3 | Purchased goods and services: cloud and hosting    | Cloudflare, DigitalOcean, and similar infrastructure used for Quarry-operated systems         | Material                                         | Vendor-reported emissions where available; otherwise spend-based factors                                                                                                          |
+| Scope&nbsp;3 | Purchased goods and services: SaaS and AI services | Collaboration, design, source control, and productivity subscriptions; AI model and API usage | Material                                         | Spend-based factors; vendor data where published                                                                                                                                  |
+| Scope&nbsp;3 | Purchased services: contractors and vendors        | Services purchased from external providers                                                    | Screened                                         | Spend-based factors                                                                                                                                                               |
+| Scope&nbsp;3 | Capital goods                                      | Laptops, monitors, and peripherals purchased or reimbursed by the Company                     | Material                                         | Manufacturer product carbon footprints, amortized over device life                                                                                                                |
+| Scope&nbsp;3 | Business travel                                    | Flights, rail, lodging, ground transport                                                      | Material                                         | Distance-based factors per trip                                                                                                                                                   |
+| Scope&nbsp;3 | Employee commuting and remote work                 | Home office energy use by workers                                                             | Material                                         | Per-worker estimate using hours worked and location-specific grid factors                                                                                                         |
+| Scope&nbsp;3 | Use of sold products                               | Energy consumed by client-owned systems running software Quarry crafted                       | Screened, then tracked by project where feasible | Page-weight and request-based estimates for front-end delivery, plus backend compute estimates (server, database, and job runtime) for client-hosted services; informational only |
+
+</ScrollTable>
+
+Emissions are reported in metric tons of CO2 equivalent (tCO2e). Where vendor data is unavailable, Quarry uses recognized spend-based or activity-based emission factors and records the source and year of each factor in the inventory workbook.
+
+## Baseline and measurement
+
+- **Baseline year:** Calendar year 2026 (January 1 through December 31, 2026).
+- **Inventory cadence:** Annual. Data collection opens in January; the inventory is finalized by March 31 of the following year.
+- **Inventory workbook:** A spreadsheet holds activity data, emission factors, calculations, and assumptions. Each line cites its data source.
+- **Data sources:** Vendor invoices and usage exports; vendor carbon reports; device purchase records; travel records; a short annual worker questionnaire covering work location, hours, and home office setup.
+- **Quality:** The first baseline will lean on spend-based estimates. Each year, the Company replaces spend-based figures with activity-based or vendor-reported data where it can. Changes in method are documented and the baseline is restated if a change moves the total by more than 5 percent.
+- **Intensity metrics:** Alongside absolute totals, Quarry tracks tCO2e per worker and tCO2e per $100,000 of revenue so that growth does not mask progress.
+
+## Targets
+
+Quarry sets targets in two stages. Stage one establishes the baseline. Stage two sets reduction targets against it.
+
+### Stage one (2026 to 2027)
+
+- Complete the 2026 baseline inventory by March 31, 2027.
+- Review core infrastructure and SaaS vendors for published climate commitments or emissions disclosures by June 30, 2027, record the results in the inventory workbook, and use them as one factor in future purchasing decisions.
+
+### Stage two (from 2027)
+
+Confirmed at the December 2027 executive review, once the baseline is final.
+
+- Reduce Scope 3 emissions intensity (tCO2e per worker) by at least 20 percent against the 2026 baseline by the end of 2030.
+- Hold absolute Scope 1 and Scope 2 emissions at zero.
+- Keep business travel emissions at or below the 2026 baseline in absolute terms.
+- Set targets in line with the Paris Agreement goal of limiting warming to 1.5°C. If the Company grows into a size tier where B Lab requires validated science-based targets, it will pursue validation through the SME route of the [Science Based Targets initiative](https://sciencebasedtargets.org/).
+
+Targets are reviewed annually. The Company does not use carbon offsets or credits to meet reduction targets. If offsets are used in future, they will be reported separately from reductions and limited to high-integrity removals.
+
+## Reduction actions
+
+Actions are grouped by where they cut emissions. Owners are proposed and confirmed at the executive review.
+
+<ScrollTable label="Reduction actions" wide>
+
+| Action                                                                                                                                                                     | Emissions addressed                                   | Owner                 | Timeline                    | Status           |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | --------------------- | --------------------------- | ---------------- |
+| Build the inventory workbook and complete the 2026 baseline                                                                                                                | All scopes                                            | Managing&nbsp;Member  | Q1&nbsp;2027                | Not&nbsp;started |
+| Adopt a vendor climate screen: prefer vendors with published emissions data, renewable energy commitments, or validated targets                                            | Scope&nbsp;3: purchased goods and services            | Managing&nbsp;Member  | Q4&nbsp;2026                | Not&nbsp;started |
+| Audit cloud and hosting accounts; right-size or decommission idle resources; select low-carbon regions where latency and compliance allow                                  | Scope&nbsp;3: cloud and hosting                       | Engineering&nbsp;lead | Q1&nbsp;2027, then annually | Not&nbsp;started |
+| Add performance and efficiency standards to Quarry’s engineering practices: page weight budgets, Core Web Vitals targets, efficient queries and caching, lean dependencies | Scope&nbsp;3: use of sold products; cloud and hosting | Engineering&nbsp;lead | Q2&nbsp;2027                | Not&nbsp;started |
+| Set AI usage guidelines: use the smallest capable model, avoid redundant calls, batch where possible, and track AI spend as a proxy for compute                            | Scope&nbsp;3: SaaS and AI services                    | Engineering&nbsp;lead | Q1&nbsp;2027                | Not&nbsp;started |
+| Extend device life: default to a four-year refresh cycle, prefer refurbished or repairable hardware, and route retired devices to reuse or certified recycling             | Scope&nbsp;3: capital goods                           | Managing&nbsp;Member  | Q4&nbsp;2026                | Not&nbsp;started |
+| Keep remote-first as the default; require a stated business purpose for any flight and prefer rail or video where practical                                                | Scope&nbsp;3: business travel                         | Managing&nbsp;Member  | In&nbsp;effect              | In&nbsp;place    |
+| Share a home office energy guide with workers (efficient lighting, standby power, renewable electricity plans where available) and run the annual worker questionnaire     | Scope&nbsp;3: remote work                             | Managing&nbsp;Member  | Q1&nbsp;2027                | Not&nbsp;started |
+| Apply data minimization: collect and retain only what a product needs, and set retention limits for logs, backups, and analytics data                                      | Scope&nbsp;3: cloud and hosting; use of sold products | Engineering&nbsp;lead | Q2&nbsp;2027                | Not&nbsp;started |
+| Offer clients an optional sustainability note at project kickoff covering hosting choices, performance budgets, and data retention                                         | Scope&nbsp;3: use of sold products                    | Managing&nbsp;Member  | Q2&nbsp;2027                | Not&nbsp;started |
+
+</ScrollTable>
+
+Software efficiency is the action with the widest reach. Lightweight, accessible software runs well on older devices and slower connections, which extends device life and lowers energy use for every person who uses it. This is the same principle behind Quarry’s accessibility and privacy commitments.
+
+## Governance and responsibilities
+
+- **Managing Member** is accountable for this plan, approves targets, owns the annual inventory, and reports results at the executive review.
+- **Engineering lead** owns the technical actions: infrastructure audits, efficiency standards, AI usage guidelines, and data minimization.
+- **Key internal stakeholders** review progress at the December 1 executive review and advise on targets.
+- **All workers** complete the annual questionnaire and follow the travel, device, and AI usage guidelines.
+
+Climate performance is a standing item at the annual executive review. The Managing Member records decisions in the review minutes.
+
+## Milestones
+
+<ScrollTable label="Milestones">
+
+| Date                  | Milestone                                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| December&nbsp;1, 2026 | Plan reviewed at the annual executive review; owners confirmed                                                  |
+| December&nbsp;2026    | Vendor climate screen and device policy in effect                                                               |
+| January&nbsp;2027     | Baseline data collection opens; worker questionnaire sent                                                       |
+| March&nbsp;31, 2027   | 2026 baseline inventory finalized                                                                               |
+| June&nbsp;30, 2027    | Engineering efficiency standards, AI usage guidelines, and data minimization practices published to all workers |
+| December&nbsp;2027    | Stage two reduction targets confirmed against the final baseline                                                |
+| Annually from 2028    | Inventory updated, progress reported, plan revised                                                              |
+
+</ScrollTable>
+
+## Reporting and review
+
+- **Internal reporting:** Results and progress against actions are presented at each annual executive review and summarized for all workers.
+- **External reporting:** Inventory totals, targets, and progress are included in the Company’s public impact reporting and submitted to standards bodies as required.
+- **Records:** This plan, the inventory workbook, the vendor climate screen, executive review minutes recording adoption, and the published efficiency standards.
+- **Plan review:** Annually at minimum, and whenever Quarry materially changes headcount, opens a facility, or materially changes its infrastructure.
+
+## Related documents
+
+- Operating Agreement (Section 2.2 Public Benefit Purpose; Article V Managing Member standards of conduct)
+- [Responsible Marketing & Public Relations Policy](/policies/responsible-marketing), which applies to any public climate claims
+- Climate inventory workbook
+- [GHG Protocol Corporate Standard](https://ghgprotocol.org/corporate-standard)
+- [Science Based Targets initiative](https://sciencebasedtargets.org/)
+- [B Lab Standards](https://www.bcorporation.net/en-us/standards/)
+
+---
+
+This plan has been developed to support compliance with the requirements of the B Lab Standards Version 2.2 and to advance the Company’s commitment to sustainable business practices. It should be interpreted and implemented in a manner consistent with applicable B Lab Standards requirements and any future updates adopted by B Lab.

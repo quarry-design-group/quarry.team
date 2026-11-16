@@ -1,0 +1,143 @@
+---
+import { getCollection, render } from 'astro:content';
+import { Image, getImage } from 'astro:assets';
+import Base from '@/layouts/Base.astro';
+import PostCard from '@/components/PostCard.astro';
+import Prose from '@/components/Prose.astro';
+import { creditHtml } from '@/lib/credit';
+import { formatDate } from '@/lib/dates';
+import { site } from '@/lib/site';
+export async function getStaticPaths() {
+  const posts = (await getCollection('posts')).filter((p) => !p.data.draft);
+  return posts.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+const { entry } = Astro.props;
+const { data } = entry;
+const { Content } = await render(entry);
+
+// Per-page social image from the hero, cropped to the canonical 1200×630
+// social aspect so Twitter/LinkedIn/Slack never letterbox or re-crop.
+const ogWidth = 1200;
+const ogHeight = 630;
+const ogImg = data.hero
+  ? (
+      await getImage({
+        src: data.hero,
+        width: ogWidth,
+        height: ogHeight,
+        fit: 'cover',
+        format: 'jpeg',
+        quality: 80,
+      })
+    ).src
+  : '/og/default.png';
+const pageUrl = `${site.url}/blog/${entry.id}`;
+
+// "Related reading": 2–3 other posts — same category first, then tag overlap,
+// then recency; topped up with the most recent remaining posts when thin.
+// Mirrors the "More work" block on case pages so neither surface dead-ends.
+const otherPosts = (await getCollection('posts'))
+  .filter((p) => !p.data.draft && p.id !== entry.id)
+  .sort((a, b) => b.data.publishedDate.getTime() - a.data.publishedDate.getTime());
+const sameCategory = otherPosts.filter((p) => data.category && p.data.category === data.category);
+const sharesTag = otherPosts.filter(
+  (p) => !sameCategory.includes(p) && p.data.tags.some((t) => data.tags.includes(t)),
+);
+const relatedReading = [
+  ...sameCategory,
+  ...sharesTag,
+  ...otherPosts.filter((p) => !sameCategory.includes(p) && !sharesTag.includes(p)),
+].slice(0, 3);
+// Personal bylines get Person credit; house posts attribute the org by @id.
+const authorLd =
+  data.author && data.author !== 'Quarry'
+    ? { '@type': 'Person', name: data.author }
+    : { '@id': `${site.url}/#org` };
+const blogLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: data.title,
+  description: data.description,
+  image: new URL(ogImg, site.url).href,
+  datePublished: data.publishedDate.toISOString(),
+  ...(data.updatedDate ? { dateModified: data.updatedDate.toISOString() } : {}),
+  author: authorLd,
+  publisher: { '@id': `${site.url}/#org` },
+  mainEntityOfPage: pageUrl,
+};
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: site.url },
+    { '@type': 'ListItem', position: 2, name: 'Insights', item: `${site.url}/blog` },
+    { '@type': 'ListItem', position: 3, name: data.title, item: pageUrl },
+  ],
+};
+---
+
+<Base
+  title={data.title}
+  description={data.description}
+  type="article"
+  image={ogImg}
+  imageAlt={data.heroAlt || data.title}
+  imageWidth={ogWidth}
+  imageHeight={ogHeight}
+  author={data.author}
+  publishedTime={data.publishedDate.toISOString()}
+  modifiedTime={data.updatedDate?.toISOString()}
+  jsonLd={[blogLd, breadcrumbLd]}
+>
+  <article class="section">
+    <div class="container max-w-(--measure)">
+      <p class="eyebrow">{data.category ?? 'Insights'}</p>
+      <h1 class="mt-3 text-4xl">{data.title}</h1>
+      <p class="mt-3 text-sm text-(--color-text-muted)">
+        By {data.author} ·
+        <time datetime={data.publishedDate.toISOString()}>{formatDate(data.publishedDate)}</time>
+      </p>
+    </div>
+
+    {data.hero && (
+      <div class="container max-w-(--measure)">
+        <Image
+          class="mt-8 h-auto w-full rounded-xl border border-(--color-border)"
+          src={data.hero}
+          alt={data.heroAlt}
+          widths={[640, 960, 1280]}
+          sizes="(min-width: 780px) 720px, 100vw"
+          loading="eager"
+        />
+        {data.heroCredit && (
+          <p
+            class="mt-2 text-center text-xs text-(--color-text-muted) [&_a]:text-inherit [&_a]:underline [&_a]:underline-offset-2"
+            set:html={creditHtml(data.heroCredit)}
+          />
+        )}
+      </div>
+    )}
+
+    <div class="container max-w-(--measure)">
+      <Prose class="mt-8 text-lg">
+        <Content />
+      </Prose>
+    </div>
+
+    {relatedReading.length > 0 && (
+      <section class="container mt-16 border-t border-(--color-border) pt-12 pb-16">
+        <h2 class="text-2xl">Related reading</h2>
+        <ul
+          role="list"
+          class="mt-8 grid list-none grid-cols-1 gap-6 p-0 min-[43.75rem]:grid-cols-3"
+        >
+          {relatedReading.map((p) => (
+            <li>
+              <PostCard entry={p} heading="h3" />
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </article>
+</Base>

@@ -1,0 +1,55 @@
+---
+# Cited in the /compliance evidence ledger (apps/web/src/lib/compliance.ts) — keep that claim in sync.
+title: 'Maximizing client opportunity by transforming data collection for a privacy-first web'
+client: 'Confidential'
+summary: 'As fractional CTO, we turned the threat of third-party cookie deprecation into an opportunity — rebuilding the client’s data collection first-party.'
+disciplines: ['design', 'engineering', 'data', 'strategy']
+industry: 'eCommerce'
+outcome:
+  kicker: 'Future-proofed.'
+  headline: 'Server-side collection replaced client-side vendor scripts — faster pages, consistent data, no third-party cookie dependence.'
+  stat: { value: '7d → 12mo', label: 'first-party cookie lifetime' }
+releasedDate: 2025-01-31
+hero: ./hero.jpg
+heroAlt: 'Black-and-white abstract architectural facade of tightly packed triangular fins swirling in a vortex pattern'
+featured: false
+order: 5
+heroCredit: 'Photo by [Ricardo Gomez Angel](https://unsplash.com/@rgaleriacom?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash) on [Unsplash](https://unsplash.com/photos/gray-digital-wallpaper-9AdeEdYB2yk?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash)'
+---
+
+import ArchitectureDiagram from '@/components/ArchitectureDiagram.astro';
+import { before, after } from './collection';
+
+## The Challenge
+
+As your fractional CTO, Quarry doesn’t just solve problems – we identify opportunities for growth. This project exemplifies how we help clients maximize their existing strengths.
+
+Chrome’s planned deprecation of third-party cookies, announced in 2020 and reversed in 2024, set off a broad rethink of web analytics. Safari and Firefox block third-party cookies, and ad blockers and consent tooling erode client-side signal regardless of what Chrome does, so the case for owning first-party collection outlived the deadline.
+
+The existing analytics setup depended heavily on client-side vendor libraries loaded directly in users’ browsers. This approach not only faced compatibility issues with browser-driven signal loss but was already causing performance degradation through heavy third-party script loading. More concerning, the multiple collection points created inconsistencies in data collection and increased exposure to potential security vulnerabilities.
+
+<ArchitectureDiagram diagram={before} />
+
+<ArchitectureDiagram diagram={after} />
+
+## The Solution
+
+Quarry migrated eligible vendors to server-side collection through Google Tag Manager’s server-side capabilities. This approach restructured the data collection architecture, transforming multiple client-side collection points into an optimal single data stream.
+
+The new architecture uses client-side GTM solely to stream data to a server-side GTM container, employing GA4 tags as an efficient data conduit.
+
+This server-side container then becomes the central hub for dispatching data to all vendors, providing complete control over data distribution while minimizing client-side performance impact.
+
+**A real-world example**: Facebook began flagging the client’s advertising account. The issue arose from latitude and longitude parameters in search flow URLs – a common design pattern for location-based search functionality. While these parameters were not PII (Personally Identifiable Information) in any way whatsoever, Facebook’s strict PII collection policies flagged them as a potential issue. Our server-side implementation allowed us to transform this data before transmission, stripping sensitive parameters without disrupting core functionality.
+
+The new architecture also enabled the setting of first-party cookies with extended lifespans, replacing the previous seven-day limitation with a full 12 months of cookie lifetime. This improvement provides significantly better user journey analysis while maintaining strict privacy controls.
+
+## The Results
+
+The migration to server-side collection delivered immediate and significant improvements to site performance by removing client-side vendor libraries.
+
+Beyond performance gains, the new architecture ensures complete consistency in data values across all vendors – a crucial advantage over traditional client-side collection where different vendor libraries could produce varying results.
+
+The centralized data stream provides greater control over data governance, allowing precise filtering of sensitive information before it reaches vendors. This approach not only prevents PII exposure but also ensures that vendors receive only the minimum necessary data for their functions, enhancing overall privacy protection, and preventing leakage of high-value data to vendors at no cost. This is data minimization as privacy regimes like GDPR and CCPA define it — and the governance posture ISO/IEC 27701 formalizes — enforced at the infrastructure level, in one controlled stream, rather than by policy alone.
+
+Perhaps most importantly, the new architecture future-proofs the client’s analytics infrastructure against browser-driven signal loss, whatever Chrome’s cookie policy turns out to be. By moving vendor collection server-side, the solution eliminates dependence on third-party cookies while providing more reliable and consistent data collection.

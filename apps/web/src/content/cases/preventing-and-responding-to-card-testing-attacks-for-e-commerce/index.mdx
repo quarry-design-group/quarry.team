@@ -1,0 +1,45 @@
+---
+# Cited in the /compliance evidence ledger (apps/web/src/lib/compliance.ts) — keep that claim in sync.
+title: 'Preventing and responding to card testing attacks for e-commerce'
+client: 'Confidential'
+summary: 'After an automated card-testing attack, we hardened the client’s e-commerce defenses and restored payment processing in under two weeks.'
+disciplines: ['design', 'engineering', 'ecommerce']
+industry: 'eCommerce'
+outcome:
+  kicker: 'Restored.'
+  headline: 'PayPal cut API access mid-attack; payments came back hardened, with a backup processor in place.'
+  stat: { value: '<2 wks', label: 'payments restored' }
+releasedDate: 2024-11-13
+hero: ./hero.jpg
+heroAlt: 'Glass cube refracting orange and purple light against a pure black background'
+featured: false
+order: 9
+---
+
+## The Challenge
+
+- Vulnerability to automated card testing attacks
+- Lack of preventative security measures
+- No backup payment processing system
+- Delayed detection of the attack
+
+The client’s website became a target for cybercriminals conducting automated card testing attacks. These attacks involve using stolen credit card information to make numerous small transactions, testing which cards are valid for larger fraudulent purchases later. The high volume of API requests triggered by this attack led to the client’s payment processor, PayPal, revoking their API access, effectively shutting down their ability to process payments.
+
+## The Solution
+
+When the client reached out to Quarry, we went into action. Within hours, we diagnosed the issue and implemented an invisible CAPTCHA on the checkout page, effectively halting the automated attacks.
+
+Recognizing the vulnerability exposed by relying on a single payment processor, we quickly set up Stripe as a backup system. As we waited for PayPal to restore API access, Quarry’s team worked tirelessly, conducting a comprehensive security audit of the entire checkout process. We meticulously combed through the code, identifying and patching potential weak points. Because the checkout path handles cardholder data, the audit was carried out with PCI DSS — the card networks’ security standard every merchant processes under — as the bar to clear before payments came back online. Finally, to prevent future surprises, we set up a sophisticated alert system, designed to flag unusual payment activity before it could escalate into a full-blown crisis.
+
+## The Results
+
+- Restored payment processing capabilities within two weeks
+- Implemented robust security measures to prevent future attacks
+- Established a backup payment system for business continuity
+- Minimized potential for future business disruptions due to payment processing issues
+
+The impact of Quarry’s swift and comprehensive response was immediately apparent. Within two weeks, the client’s payment processing capabilities were fully restored, with the added security of a backup system in place. The newly implemented security measures proved their worth almost immediately, successfully stopping several subsequent attempted attacks.
+
+The client, initially shaken by the incident, now had a robust, multi-layered defense against cyber threats. But perhaps the most significant result was the peace of mind that came from knowing they had a partner in Quarry who could not only resolve crises but anticipate and prevent them.
+
+This incident underscored the importance of proactive security measures in e-commerce. By quickly addressing the immediate threat and implementing long-term solutions, Quarry not only resolved the client’s crisis but also strengthened their overall security posture.

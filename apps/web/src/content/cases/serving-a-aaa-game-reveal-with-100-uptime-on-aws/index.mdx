@@ -1,0 +1,142 @@
+---
+# Every figure traces to the private, anonymized evidence pack for this engagement in the
+# firm-stats ledger. Keep the numbers in sync with it; never name the client or the title.
+# Anonymity: state no elapsed time since launch (days or hours); with the publish date it
+# would pin the launch day.
+title: 'Serving a AAA game reveal with 100% uptime on AWS'
+client: 'Confidential'
+summary: 'The sites, consent-first sign-up pipeline and AWS platform behind a AAA game reveal, kept private until launch and steady through the surge.'
+disciplines: ['engineering', 'data']
+industry: 'Gaming'
+outcome:
+  kicker: 'Zero to millions.'
+  headline: 'Both sites stayed private until the reveal, then went public with one switch and took the surge without a minute of downtime.'
+  stat: { value: '100%', label: 'uptime since launch' }
+  supporting:
+    - { value: '74.1M', label: 'requests served' }
+    - { value: '11,521', label: 'sign-ups captured' }
+role: 'Infrastructure, data and launch engineering'
+releasedDate: 2026-11-14
+hero: ./hero.jpg
+heroAlt: 'Dotted chart of real traffic on the primary site: hourly requests sit at zero until the gate opens, rise to about two weeks of tall daily waves, drop sharply to a lower level, then settle near zero, while a dotted line of cumulative requests climbs from 0 to 70M+'
+featured: true
+order: 0
+---
+
+import ArchitectureDiagram from '@/components/ArchitectureDiagram.astro';
+import ScrollTable from '@/components/ScrollTable.astro';
+import architecture from './architecture';
+
+## The Challenge
+
+A AAA game publisher planned to reveal a new title in 2026. The reveal would put two marketing sites live at once, the game’s own site and a studio site, each with a sign-up form and marketing measurement behind it.
+
+The reveal set three requirements:
+
+- **Hold the surge.** The audience would arrive all at once, at a moment set by the marketing calendar. A failure at that moment would be seen by everyone watching.
+- **Stay secret until the reveal.** Both sites had to be finished and reviewed for weeks while staying unreachable from the public internet.
+- **Respect consent in every market.** The audience was global, under a matrix of consumer privacy laws with different consent and data-sharing rules in each market. Every visitor’s choices had to be honoured, with as little personal data collected as possible.
+
+Quarry has built and maintained the client’s sites, sign-up and data pipeline, and the AWS platform beneath them, alongside the client’s marketing partners.
+
+## The Solution
+
+Each requirement was met by removing a point of failure rather than adding capacity to it.
+
+### Built for the surge
+
+Both sites are pre-built pages served from AWS’s global content network, so there is no server behind them to overload when traffic spikes. Nearly every request was answered from a nearby cache. Each release is kept whole, so going live or rolling back is a single change that takes effect at once.
+
+### Private until the reveal
+
+Until the reveal, a firewall turned away everyone except the client’s reviewers. Going public was one reviewed change, planned step by step in advance and reversible the same way.
+
+### Sign-ups and measurement, with consent
+
+Each visitor sees the consent prompt their market’s rules require, and nothing optional is stored or sent until they agree. Analytics and marketing each need their own consent, and withdrawing either stops that flow. Events go first to the site’s own address, never straight to third-party trackers. A pipeline Quarry maintains for the client then forwards them to six ad platforms, a CRM and an analytics tool. Email addresses are shared only in hashed form, and sign-ups use double opt-in.
+
+### Secure and watched
+
+Every site sits behind managed attack filtering, tuned so real visitors on shared mobile or office networks were not locked out at the launch moment, with stricter controls on forms. A staffed watch, written incident plans and health checks every 30 seconds covered the launch.
+
+All of it runs on a locked-down AWS foundation defined in code, where every change is reviewed and recorded.
+
+<ArchitectureDiagram diagram={architecture} />
+
+## The Results
+
+Figures run from public launch to the time of writing, read from the production AWS logs and metrics.
+
+**Zero to millions.** Until the reveal, the primary site was closed to everyone but the client’s reviewers. Once the gate opened, it served its first **1M requests within 11 hours** and **50M within two weeks**. In all, the two sites served **74.1M requests** to about **1.09M unique visitors**.
+
+**Uptime.** Health checks every 30 seconds recorded **100% uptime** for both sites and the event intake, without a single unhealthy minute. The primary site returned **19 server errors in 73.5M requests**, about one in every 3.9 million.
+
+**Sign-ups and data.** The sign-up form accepted **11,521 sign-ups**, and **5,226** were confirmed through double opt-in. Consented marketing events made **664,629 successful deliveries** to the ad, CRM and analytics tools, and **99.9%** of delivery attempts succeeded.
+
+**Protection.** Before launch, the gate turned away **487,159 requests** from outside the reviewers’ networks. After launch, firewall rules blocked **90,096 malicious requests**.
+
+**Attribution.** About two-thirds of page loads on the primary site arrived from the client’s paid ads, and traffic fell to roughly a twenty-fifth of its campaign level when the campaign ended. These results measure how the platform served, protected and captured that audience, not how the audience was won.
+
+## Technical detail
+
+### Foundation and access
+
+- Multi-account AWS organization: security and logging, staging, production and data-pipeline accounts, all in Terraform.
+- Organization-wide audit trail on write-once storage under a customer-managed key, verified before anything else was built. Service control policies block disabling it, long-lived IAM users or keys, and unapproved Regions.
+- Single sign-on with scoped roles for people. Keyless CI through GitHub OIDC, with separate plan and apply roles. Every apply checks audit-log integrity and rejects any plan that deletes or replaces a resource.
+
+### Sites and releases
+
+- Statically exported, localized Next.js on private S3 origins behind CloudFront. Nothing renders at request time, so there is no origin compute to saturate.
+- Immutable releases: an edge function reads a key-value pointer to the live release, so go-live and rollback are one pointer change with no cache invalidation. Each release passes an approval gate and post-deploy checks, with automatic rollback.
+
+### Launch gate
+
+- Default-deny firewall allowing only reviewer networks. Going public was one reviewed variable change through the protected pipeline, with no change to buckets, CDN or firewall rules. Sequence: private acceptance, the switch, external probes, then a redeploy of the same build so the public security checks ran against it.
+
+### Event pipeline
+
+- Two optional consent categories, analytics and targeting, behind a typed adapter. CRM and ad-conversion delivery require targeting consent, checked again at the event API. Per-market rules live in the consent platform; the visitor’s location never authorizes or routes an event, only the categories they grant. Withdrawing analytics consent clears the analytics identity; withdrawing targeting consent stops CRM and ad events. No third-party SDK or write key in the page.
+- Durable outbox before acknowledgement, idempotent retries, a replay queue and a time-limited archive.
+- Self-hosted, open-source customer data pipeline on Kubernetes, fanning out to eight destinations. Emails hashed; IPs hashed except where a destination’s contract requires them; no request bodies in logs.
+- Double opt-in with enumeration-safe responses, expiring links, and per-address and per-network rate limits.
+
+### Edge protection
+
+- AWS managed rules (common exploits, known-bad inputs, SQL injection, IP reputation) on every site. On the primary site, reputation and common rules ran in count mode so shared networks were not locked out at launch. Enforcement is concentrated on forms and APIs: rate limits, targeted bot control, and a silent challenge instead of a CAPTCHA.
+- A rotating origin-verification header, checked by a regional firewall and in code. A strict content security policy with build-time hashes and a per-response nonce.
+
+### Operations
+
+- 30-second HTTPS health checks on every site and API, plus CDN error-rate and firewall alarms.
+- Launch runbook with severity levels, an incident commander and written scenarios, each with a kill switch. Production is read-only by default, with short-lived break-glass access. A staffed watch covered the launch window.
+
+### By the numbers
+
+<ScrollTable label="Results by the numbers" wide>
+
+| Measure (since launch)                           | Figure                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| Requests · data served                           | 74.1M · 7.92 TB                                              |
+| CDN cache hit ratio, primary site                | 99.5%                                                        |
+| Unique visitors · visits · page loads            | ~1.09M · ~1.65M · 1.86M                                      |
+| Climb from the gate opening, primary site        | 1M in 11 h · 10M in ~3 days · 25M in a week · 50M in 2 weeks |
+| Busiest 24 hours · second                        | 4.8M · 1,023                                                 |
+| Server errors, primary site                      | 19 in 73.5M                                                  |
+| Consented events accepted                        | 244,026                                                      |
+| Destination deliveries (ad · CRM · analytics)    | 664,629 (415,004 · 49,169 · 200,456)                         |
+| Delivery attempts succeeded · rejected outright  | 99.9% · 136                                                  |
+| Firewall: blocked · challenged · pre-launch gate | 90,096 · 4,498 · 487,159                                     |
+
+</ScrollTable>
+
+### Measurement
+
+- **Source.** CDN access logs, edge and firewall metrics, health-check status and pipeline counters from the production AWS account, read with a read-only role. Logs are retained for 400 days, so nothing in the window had aged out. Request, byte and error totals reconcile with the CDN’s own metrics to within 0.01%.
+- **Requests** exclude the health checker’s own probes.
+- **Page loads** are successful HTML responses whose user agent does not match a bot list (crawlers, HTTP libraries, headless browsers, monitors, link previewers). IP addresses with 100 or more page loads in a month are excluded, which removes a few hundred automated sources. Client-side navigations are not counted, so page loads understate page views.
+- **Visitors and visits.** Unique visitors are an approximate distinct count of client IP addresses on those page loads; shared mobile networks pull it down and rotating addresses push it up. Visits approximate a 30-minute session: a distinct IP address and user agent within a 30-minute window.
+- **Sign-ups and events** are counts of accepted server responses. No personal data was read to produce them.
+- **Deliveries** are the pipeline’s per-destination outcome counters from launch day, summed across a server upgrade partway through that started new metric series. The success rate counts every failed attempt, including transient errors later retried.
+- **Cache hit ratio** is cache hits over hits plus misses, excluding redirects, errors and edge-function responses.
+- **The chart at the top** plots the primary site’s hourly requests from the CDN’s own metrics, with health-check probes subtracted, from a day before launch to six weeks after. The dotted line is cumulative requests since the gate opened. The climb milestones and the busiest 24 hours come from the same hourly series and are estimates, since the health-check probes are subtracted as a steady hourly rate; the busiest second comes from the access logs.

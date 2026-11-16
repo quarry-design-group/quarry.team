@@ -1,0 +1,241 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only token: these jobs only check out and build. Third-party code runs
+# here (postinstall scripts, dlx) — never hand it a writable GITHUB_TOKEN.
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 24
+  PNPM_VERSION: 10.14.0
+
+jobs:
+  build-test:
+    name: Lint · Typecheck · Build · Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate design tokens
+        run: pnpm --filter @quarry/ui build
+
+      - name: Docs mirror is in sync with docs/
+        run: |
+          pnpm --filter @quarry/docs sync
+          git diff --exit-code -- apps/docs/src/content/docs \
+            || { echo "::error::apps/docs is a generated mirror of docs/ and is stale. Run 'pnpm --filter @quarry/docs sync' after editing docs/, then commit."; exit 1; }
+
+      # Fail if the generated projections were not regenerated from tokens.json
+      # before commit (tokens.css = code side; figma.tokens.json = Figma side).
+      - name: Design tokens in sync (tokens.json → tokens.css, figma.tokens.json)
+        run: git diff --exit-code -- packages/ui/tokens/tokens.css packages/ui/tokens/figma.tokens.json
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Image budgets (content rasters within edge/byte caps)
+        run: pnpm images:check
+
+      - name: Build site
+        run: pnpm --filter @quarry/web build
+        env:
+          SITE_URL: https://quarry.team
+
+      - name: Asset references resolve (no 404s in built output)
+        run: node scripts/check-asset-refs.mjs
+
+      # The docs site deploys on pushes that touch apps/docs/, docs/ or the
+      # lockfile (deploy-docs.yml); building it here exercises every such
+      # change before merge, Dependabot lockfile bumps included.
+      - name: Build docs site
+        run: pnpm --filter @quarry/docs build
+
+      - name: Unit tests
+        run: pnpm test
+
+      # The one build every downstream job tests: the E2E and Lighthouse shards
+      # download this instead of rebuilding. Hidden files included: dist/client
+      # carries .assetsignore (keeps the Worker bundle out of the asset upload)
+      # and .well-known/security.txt.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-dist
+          path: apps/web/dist
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  # E2E and Lighthouse are sharded across parallel jobs. Each suite's required
+  # check (branch protection) is the gate job that keeps the suite's original
+  # name and fails unless every shard succeeded; the shard jobs themselves are
+  # never required, so the shard count can change without touching protection.
+  # The gates run `always()`: a shard skipped because build-test failed, or
+  # cancelled, fails its gate, where a gate skipped by its own `if` would count
+  # as a passing required check.
+  e2e-shard:
+    name: E2E · shard ${{ matrix.shard }}/${{ strategy.job-total }}
+    runs-on: ubuntu-latest
+    needs: build-test
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Playwright --shard splits the test list evenly (the serial worker
+        # project by file). Two shards keep E2E off the critical path, which
+        # Lighthouse sets.
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Download build artifact (Playwright serves the built dist)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-dist
+          path: apps/web/dist
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run E2E (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+        # blob: the gate merges every shard's blob into one HTML report.
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=blob,list
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report
+          retention-days: 1
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: e2e-shard
+    if: always()
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Download shard reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+      - name: Merge shard reports into one HTML report
+        run: |
+          if compgen -G 'all-blob-reports/*.zip' > /dev/null; then
+            pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+          else
+            echo "::warning::No shard produced a blob report to merge."
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+      # Runs even when a report step failed or the run was cancelled, so the
+      # verdict is always the shards' result; a broken merge alone still fails
+      # the gate (fail closed).
+      - name: Every shard passed
+        if: always()
+        env:
+          RESULT: ${{ needs.e2e-shard.result }}
+        run: |
+          [ "$RESULT" = success ] \
+            || { echo "::error::E2E shards finished '$RESULT' (want 'success'). Read the failing shard's log or the merged playwright-report artifact."; exit 1; }
+
+  lighthouse-shard:
+    name: Lighthouse CI · shard ${{ matrix.shard }}/${{ strategy.job-total }}
+    runs-on: ubuntu-latest
+    needs: build-test
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # lighthouserc.cjs packs the URLs into this many shards by measured
+        # cost (the WebGL team page alone is ~5 min); every URL's runs stay in
+        # one shard, so medians and assertions match an unsharded run.
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # No `pnpm install`: LHCI runs through dlx and lighthouserc.cjs requires
+      # nothing, so the workspace's dependencies are dead weight here.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Download build artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-dist
+          path: apps/web/dist
+      - name: Run Lighthouse CI (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+        # No fallback on this command: error-level assertions (a11y/SEO at
+        # minScore 1, lighthouserc.cjs) must fail this shard, and so the gate.
+        run: pnpm dlx @lhci/cli@0.15.1 autorun
+        env:
+          LIGHTHOUSE_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
+
+  lighthouse:
+    name: Lighthouse CI (CWV budgets)
+    runs-on: ubuntu-latest
+    needs: lighthouse-shard
+    if: always()
+    steps:
+      # Step-level always() too: the implicit success() is false once the run
+      # is cancelled, and a gate whose only step skipped asserts nothing.
+      - name: Every shard passed
+        if: always()
+        env:
+          RESULT: ${{ needs.lighthouse-shard.result }}
+        run: |
+          [ "$RESULT" = success ] \
+            || { echo "::error::Lighthouse shards finished '$RESULT' (want 'success'). Read the failing shard's assertion output."; exit 1; }

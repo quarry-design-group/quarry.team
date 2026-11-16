@@ -1,0 +1,139 @@
+---
+import Logo from '@/components/Logo.astro';
+import Email from '@/components/Email.astro';
+import { site, navLinks, partnerLogos } from '@/lib/site';
+const year = new Date().getFullYear();
+---
+
+<footer class="surface-dark mt-24 border-t border-(--color-ink-panel-border) bg-(--color-ink-panel) pt-16 pb-8 text-stone-25">
+  <div class="container">
+    <div class="grid grid-cols-1 gap-12 border-b border-stone-800 pb-12 md:grid-cols-[1.2fr_2fr]">
+      <div>
+        {/* Brand mark inherits text color (white on the dark panel) — not the link color. */}
+        <a class="inline-flex text-(--color-text)" href="/" aria-label="Quarry home">
+          <Logo class="block h-[26px] w-auto" />
+        </a>
+        <p class="mt-4 max-w-[34ch] text-stone-300">{site.tagline}</p>
+      </div>
+
+      <!-- repeat(2,1fr) not grid-cols-2: 1fr's auto minimum lets the address column
+           size to its content on narrow screens (Tailwind's minmax(0,1fr) halves
+           clip the email and stop column 1 from wrapping). -->
+      <nav class="grid grid-cols-[repeat(2,1fr)] gap-6" aria-label="Footer">
+        <div>
+          <h2 class="mb-3 font-mono text-xs tracking-[0.12em] text-stone-300 uppercase">Explore</h2>
+          <ul role="list" class="m-0 grid list-none gap-2 p-0">
+            {navLinks().map((i) => (
+              <li>
+                <a class="text-sm text-stone-300 hover:text-stone-25" href={i.href}>
+                  {i.label}
+                </a>
+              </li>
+            ))}
+            <li>
+              <a class="text-sm text-stone-300 hover:text-stone-25" href="/contact">
+                Contact
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h2 class="mb-3 font-mono text-xs tracking-[0.12em] text-stone-300 uppercase">Quarry</h2>
+          <ul role="list" class="m-0 grid list-none gap-2 p-0">
+            <li>
+              <Email address={site.email} />
+            </li>
+            <li>
+              <a class="text-sm text-stone-300 hover:text-stone-25" href={`tel:${site.phone}`}>
+                {site.phoneDisplay}
+              </a>
+            </li>
+            <li>
+              <span class="text-sm text-stone-300">
+                {site.address.city}, {site.address.region} · Global
+              </span>
+            </li>
+            {/* The grievance mechanism sits with the contact channels: it is a
+                way to reach us, not legal boilerplate (ADR-0016/0017). */}
+            <li>
+              <a
+                class="text-sm text-stone-300 hover:text-stone-25"
+                href="/policies/grievances"
+                data-astro-prefetch="false"
+              >
+                Raise a concern
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+    </div>
+
+    <div class="flex justify-center border-b border-stone-800 py-8">
+      <ul
+        class="m-0 flex list-none flex-wrap items-center justify-center gap-x-12 gap-y-6 p-0"
+        role="list"
+      >
+        {partnerLogos.map((p) => (
+          <li class="group">
+            {/* Plain <img>, not <Image>: the badges are all SVG, which the
+                  image service passes through at build but the Cloudflare
+                  adapter's /_image endpoint rejects (400) in dev. The imported
+                  metadata still gives hashed immutable URLs + intrinsic dims.
+
+                  Footer is always dark — simple badges get a uniform soft-white
+                  silhouette (grayscale→black→invert). The `asIs` lockup
+                  (Shopify Partners) is pre-recolored soft-white artwork and
+                  renders un-filtered so the silhouette doesn't collapse it into
+                  one shape; `desat` badges (Hyvä) only desaturate to keep their
+                  multi-detail form. */}
+            <img
+              class:list={[
+                'h-7 w-auto max-w-[130px] object-contain transition-opacity duration-250 ease-out',
+                p.asIs
+                  ? 'opacity-85'
+                  : p.desat
+                    ? 'opacity-[0.72] grayscale'
+                    : 'opacity-60 grayscale brightness-0 invert group-hover:opacity-[0.92]',
+              ]}
+              src={p.src.src}
+              alt={p.name}
+              width={p.src.width}
+              height={p.src.height}
+              loading="lazy"
+              decoding="async"
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-4 pt-6 text-sm text-stone-300">
+      <p>
+        © {site.founded}–{year} {site.legalName}. Built by Quarry.
+      </p>
+      <ul role="list" class="m-0 flex list-none gap-4 p-0">
+        <li>
+          <a class="text-stone-300 hover:text-stone-25" href="/policies/privacy">
+            Privacy
+          </a>
+        </li>
+        <li>
+          <a class="text-stone-300 hover:text-stone-25" href="/policies/terms">
+            Terms
+          </a>
+        </li>
+        <li>
+          <a class="text-stone-300 hover:text-stone-25" href="/policies">
+            All policies
+          </a>
+        </li>
+        <li>
+          <a class="text-stone-300 hover:text-stone-25" href="/llms.txt">
+            llms.txt
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</footer>

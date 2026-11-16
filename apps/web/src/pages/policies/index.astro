@@ -1,0 +1,76 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import { POLICY_CATEGORY_ORDER, categoryLabels } from '@/lib/policies';
+import { formatDate } from '@/lib/dates';
+
+/**
+ * /policies — the index of the governance class: every published policy,
+ * grouped by category, from the `policies` collection. Governance documents
+ * (how we conduct ourselves and how to hold us to it) lead; the legal
+ * boilerplate follows. Adding a policy is adding an MDX entry — this page,
+ * the footer, and the sitemap pick it up. See ADR-0016.
+ */
+const all = (await getCollection('policies'))
+  .filter((p) => !p.data.draft)
+  .sort((a, b) => a.data.order - b.data.order);
+const groups = POLICY_CATEGORY_ORDER.map((category) => ({
+  category,
+  label: categoryLabels[category],
+  entries: all.filter((p) => p.data.category === category),
+})).filter((g) => g.entries.length > 0);
+---
+
+<Base
+  title="Policies and commitments"
+  description="The documents that govern how Quarry operates: raising a concern, marketing, public policy, climate action, human rights and JEDI, your data, and our terms."
+>
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Policies</p>
+      <h1 class="mt-3 max-w-[20ch] text-4xl">How we hold ourselves accountable.</h1>
+      <p class="measure mt-4 text-lg text-(--color-text-muted)">
+        These are the documents that govern how Quarry operates: how anyone affected by our work can
+        raise a concern, how we market ourselves and speak publicly, how we engage on public policy,
+        how we measure and reduce our climate impact, how we respect human rights and treat the
+        people we work with fairly, how we handle the data you give us, and the terms of working
+        with us. Each is written in plain language and notes when it was last updated.
+      </p>
+
+      {groups.map((g) => (
+        <section class="mt-16" aria-labelledby={`policies-${g.category}`}>
+          <h2
+            id={`policies-${g.category}`}
+            class="font-mono text-xs tracking-[0.12em] text-(--color-text-muted) uppercase"
+          >
+            {g.label}
+          </h2>
+          <ul class="m-0 mt-4 list-none p-0" role="list">
+            {g.entries.map((p) => (
+              <li class="border-t border-(--color-border) py-6 last:border-b">
+                <a
+                  class="group grid grid-cols-1 gap-x-8 gap-y-2 no-underline md:grid-cols-[minmax(0,1fr)_200px]"
+                  href={`/policies/${p.id}`}
+                  data-astro-prefetch={p.data.interactive ? 'false' : undefined}
+                >
+                  <div>
+                    <h3 class="text-2xl text-(--color-text) group-hover:underline group-hover:underline-offset-4">
+                      {p.data.title}
+                    </h3>
+                    <p class="mt-2 max-w-[62ch] text-(--color-text-muted)">{p.data.summary}</p>
+                  </div>
+                  <p class="m-0 text-sm text-(--color-text-muted) md:pt-[0.4em] md:text-right">
+                    Updated{' '}
+                    <time datetime={p.data.updated.toISOString().slice(0, 10)}>
+                      {formatDate(p.data.updated)}
+                    </time>
+                  </p>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  </section>
+</Base>

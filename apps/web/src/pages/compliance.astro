@@ -1,0 +1,184 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import Compliance from '@/components/Compliance.astro';
+import CtaBand from '@/components/CtaBand.astro';
+import { ledger } from '@/lib/compliance';
+
+/**
+ * Compliance — the regulated-environments backbone page. Written for the
+ * procurement reviewer: every claim traces to a published case study or to a
+ * practice that is inspectable on this site. No badges we don't hold, no
+ * adjectives doing the work of evidence.
+ *
+ * The evidence ledger itself lives in src/lib/compliance.ts — shared with the
+ * work-detail template, which renders a regulated-environment note on every
+ * cited case.
+ */
+
+const allCases = await getCollection('cases');
+const byId = new Map(allCases.map((c) => [c.id, c]));
+const evidence = ledger.map((e) => {
+  const entry = byId.get(e.slug);
+  if (!entry || entry.data.draft || entry.data.comingSoon)
+    throw new Error(`compliance.astro: evidence case "${e.slug}" is missing or unpublished`);
+  return { ...e, entry };
+});
+
+// How we operate — practices a reviewer can verify, not values statements.
+const posture: { title: string; body: string }[] = [
+  {
+    title: 'Decisions on the record',
+    body: 'Significant architecture decisions are written down as decision records when they’re made — so a reviewer can read why the system is the way it is instead of reverse-engineering it.',
+  },
+  {
+    title: 'Infrastructure as code',
+    body: 'The config plane lives in version-controlled Terraform: reviewable, repeatable, and diffable. No console drift, no tribal knowledge standing in for an audit trail.',
+  },
+  {
+    title: 'A gated path to production',
+    body: 'Protected mainline; every change passes type checks, lint, unit and end-to-end tests, and performance budgets before it ships. A red build is a stop-the-line event.',
+  },
+  {
+    title: 'Privacy and minimum necessary by default',
+    body: 'Privacy-first analytics with no cookie banner, PII collected minimally and retained deliberately, secrets kept out of source control, least-privilege access.',
+  },
+  {
+    title: 'Accessibility as a floor',
+    body: 'WCAG 2.2 AA is a non-negotiable on everything we ship — semantics, keyboard, focus, contrast — not a remediation project after launch.',
+  },
+  {
+    title: 'Your perimeter, your tools',
+    body: 'We work inside your cloud accounts, your repositories, your access controls, and your work OS — so nothing about the engagement weakens the boundary you answer for.',
+  },
+];
+
+// What diligence should expect — said plainly, because the fastest way to
+// fail a procurement review is to overclaim.
+const diligence: { title: string; body: string }[] = [
+  {
+    title: 'We deliver to your framework. We are not your auditor.',
+    body: 'We design and engineer to the controls and produce the artifacts an assessor asks for — architecture and data-flow diagrams, decision records, audit logging, runbooks. Certification of your organization stays with your auditor, where it belongs.',
+  },
+  {
+    title: 'Confidentiality is the norm here.',
+    body: 'Most regulated engagements ship under NDA — it’s why several of the case studies above are anonymized. We’ll share what we can, and tell you plainly what we can’t.',
+  },
+  {
+    title: 'Bring the questionnaire.',
+    body: 'Security questionnaires, vendor reviews, and procurement diligence are an expected part of working with us — answered directly by the senior people who do the work, not a proposals team.',
+  },
+];
+---
+
+<Base
+  title="Compliance: delivering in regulated environments"
+  description="HIPAA architecture, PCI incident response, privacy-first data platforms: hard evidence of how Quarry delivers in regulated, high-compliance environments."
+>
+  {/* Head band trims .section's bottom padding, so it sets both sides itself. */}
+  <section class="pt-(--space-section) pb-8">
+    <div class="container">
+      <p class="eyebrow">Regulated environments</p>
+      <h1 class="mt-3 text-4xl">Experience you can audit.</h1>
+      <p class="measure mt-4 text-lg text-(--color-text-muted)">
+        Healthcare, payments, financial services, privacy regimes: a decade of delivering to the
+        frameworks that govern them. What follows is the evidence — case studies you can read, and
+        practices you can inspect — not adjectives.
+      </p>
+    </div>
+  </section>
+
+  <!-- THE EVIDENCE LEDGER — a register, not a card grid: regime in the margin,
+       claim in the body, the case title as the citation. -->
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Hard evidence</p>
+      <h2 class="sub mt-3 max-w-[24ch] text-3xl">The record, engagement by engagement.</h2>
+      <p class="measure mt-3 text-(--color-text-muted)">
+        Every line below cites the framework the engagement was delivered to or under, and links to
+        a published case study. Where the client is anonymized, it’s because the engagement shipped
+        under NDA — the work is real either way.
+      </p>
+      <ul class="m-0 mt-12 list-none p-0" role="list">
+        {evidence.map((e) => (
+          <li class="grid grid-cols-1 gap-x-8 gap-y-2 border-t border-(--color-border) py-6 last:border-b md:grid-cols-[240px_1fr]">
+            {/* pt-[0.3em] optically aligns the regime with the claim's first line. */}
+            <span class="pt-[0.3em] font-mono text-xs tracking-[0.06em] text-(--color-primary) uppercase">
+              {e.regime}
+            </span>
+            <div>
+              <p class="max-w-[62ch] text-lg">{e.claim}</p>
+              <a class="mt-3 inline-block text-sm font-semibold" href={`/work/${e.entry.id}`}>
+                {e.entry.data.title} →
+              </a>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- FRAMEWORKS — the same component, and the same single source of truth,
+       as the homepage's regulated-environments section. The homepage lede is
+       replaced here: the ledger above has already made those claims in full,
+       and the grid needs the one caveat that keeps it honest. -->
+  <Compliance
+    class="section"
+    cta={false}
+    lede="The frameworks we design and deliver to — not certifications we hold."
+  />
+
+  <!-- OPERATING POSTURE — bordered practices, mirroring the services cards. -->
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Operating posture</p>
+      <h2 class="sub mt-3 max-w-[24ch] text-3xl">Process that stands up to diligence.</h2>
+      <p class="measure mt-3 text-(--color-text-muted)">
+        Compliance fails in the gaps between intentions and habits. These are the habits — and this
+        site is built under the same rules, so run Lighthouse on it.
+      </p>
+      <ul
+        class="m-0 mt-12 grid list-none grid-cols-1 gap-4 p-0 min-[43.75rem]:grid-cols-2 lg:grid-cols-3"
+        role="list"
+      >
+        {posture.map((p) => (
+          <li class="rounded-md border border-(--color-border) bg-(--color-surface) p-6">
+            <h3 class="text-xl">{p.title}</h3>
+            <p class="mt-2 text-sm text-(--color-text-muted)">{p.body}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- STRAIGHT TALK FOR PROCUREMENT — the dark ink panel, same surface as the
+       featured case. -->
+  <section class="section">
+    <div class="container">
+      <div class="surface-dark rounded-xl border border-(--color-ink-panel-border) bg-(--color-ink-panel) p-[clamp(1.5rem,1rem+3vw,3.5rem)] text-stone-25">
+        <p class="eyebrow text-blue-300">For the procurement file</p>
+        <h2 class="mt-3 max-w-[24ch] text-3xl text-stone-25">
+          Three things we’d rather say now than in the review.
+        </h2>
+        <div class="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3">
+          {diligence.map((d) => (
+            <div class="border-t-2 border-ember-500 pt-4">
+              <h3 class="text-lg text-stone-25">{d.title}</h3>
+              <p class="mt-3 text-sm text-stone-300">{d.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* CTA band trims .section's top padding, so it sets both sides itself. */}
+  <section class="pt-4 pb-(--space-section)">
+    <div class="container">
+      <CtaBand
+        title="Have a framework to meet?"
+        sub="Tell us the standard and the deadline. We reply within one business day."
+      />
+    </div>
+  </section>
+</Base>

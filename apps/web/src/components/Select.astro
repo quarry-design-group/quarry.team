@@ -1,0 +1,62 @@
+---
+/**
+ * Select — the design system's single-choice dropdown. Every `<select>` on
+ * the site renders through this component; `src/lib/form-primitives.test.ts`
+ * fails on one anywhere else, and `tests/e2e/select.spec.ts` measures the
+ * rendered result.
+ *
+ * A native select draws the platform's arrow, which ignores the field's
+ * padding (Chrome places it against the border) and takes the platform's
+ * color and weight. It also ignores line-height, so it renders shorter than
+ * the text inputs beside it. This component hides the native arrow, reserves
+ * room for a chevron drawn in the text color inside the field's padding, and
+ * sets a minimum height of one line plus the field's padding and its 1px
+ * border, which is the height of a text input with the same type and size.
+ *
+ * `size` owns the box metrics and matches the form's text inputs: `md` is
+ * 0.85rem × 0.7rem (the contact and grievance forms), `lg` is 1rem × 0.75rem
+ * (the search form). `fieldClass` carries the form's skin: background, border
+ * color, radius, type and states. `class` styles the wrapper (width, margin).
+ */
+import type { HTMLAttributes } from 'astro/types';
+
+interface Props extends Omit<HTMLAttributes<'select'>, 'class' | 'size'> {
+  size?: 'md' | 'lg';
+  fieldClass?: string;
+  class?: string;
+}
+const { size = 'md', fieldClass, class: cls, ...rest } = Astro.props;
+
+const sizes: Record<'md' | 'lg', { field: string; chevron: string }> = {
+  md: {
+    field: 'px-[0.85rem] py-[0.7rem] min-h-[calc(1lh+1.4rem+2px)]',
+    chevron: 'right-[1.05rem]',
+  },
+  lg: {
+    field: 'px-4 py-3 min-h-[calc(1lh+1.5rem+2px)]',
+    chevron: 'right-[1.2rem]',
+  },
+};
+---
+
+<div class:list={['relative', cls]}>
+  <select
+    class:list={[
+      'block w-full cursor-pointer appearance-none border',
+      fieldClass,
+      sizes[size].field,
+      'pr-11',
+    ]}
+    {...rest}
+  >
+    <slot />
+  </select>
+  <span
+    class:list={[
+      'pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-y-[70%] rotate-45 border-r-2 border-b-2 border-current',
+      sizes[size].chevron,
+    ]}
+    aria-hidden="true"
+    data-select-chevron
+  ></span>
+</div>

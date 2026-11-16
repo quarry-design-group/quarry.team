@@ -1,0 +1,223 @@
+---
+/**
+ * SubmissionForm — reusable form-submission capture that POSTs JSON to the
+ * same-origin API route (/api/contact or /api/careers). `kind` selects the
+ * fields and the copy: a contact inquiry (name, work email, organization,
+ * message) or a careers application (name, email, role, optional Loom intro,
+ * links, message). Includes:
+ *  - a honeypot field hidden from humans (HONEYPOT_FIELD),
+ *  - Cloudflare Turnstile, rendered only when PUBLIC_TURNSTILE_SITE_KEY is set;
+ *    deployed builds refuse submissions that fail verification (ADR-0014),
+ *  - an accessible status region and a non-blocking submit handler that
+ *    disables the button while a request is in flight and resets the
+ *    Turnstile widget after every attempt, since a token verifies only once.
+ *
+ * Each instance's inline script binds the submit handler to its own form only
+ * (document.currentScript), so the component can appear more than once without
+ * double-binding.
+ */
+import Email from '@/components/Email.astro';
+import { HONEYPOT_FIELD } from '@/lib/form-submissions';
+import { site } from '@/lib/site';
+
+interface Props {
+  kind: 'contact' | 'careers';
+  /** The form element's id (an anchor or a test hook). */
+  id?: string;
+  /** Heading shown above the form. */
+  heading?: string;
+  /** Supporting line under the heading. */
+  intro?: string;
+  /** Pre-fill + lock the role (used on a position detail page). */
+  role?: string;
+  /** Require a Loom intro link (position applications). The server validates
+   *  the format (loom.com) but only the client enforces presence — the general
+   *  interest form on /careers posts to the same endpoint without it. */
+  loom?: boolean;
+  /** Submit button label. */
+  submitLabel?: string;
+  class?: string;
+}
+const {
+  kind,
+  id,
+  heading,
+  intro,
+  role,
+  loom = false,
+  submitLabel = kind === 'contact' ? 'Send inquiry' : 'Send application',
+  class: cls,
+} = Astro.props;
+
+const contact = kind === 'contact';
+// The recovery-path inbox follows the form's purpose.
+const fallbackEmail = contact ? site.email : 'careers@quarry.team';
+
+const action = `/api/${kind}`;
+const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '';
+
+// Shared utility strings for repeated form controls.
+const labelCls = 'grid gap-2 text-sm font-medium';
+const hintCls = 'font-mono text-xs font-normal text-(--color-text-muted)';
+const fieldCls =
+  'rounded-md border border-(--color-border-strong) bg-(--color-bg) px-[0.85rem] py-[0.7rem] text-base [font-family:inherit]';
+---
+
+{(heading || intro) && (
+  <div class="mb-4">
+    {heading && <h3 class="text-2xl">{heading}</h3>}
+    {intro && <p class="mt-2 text-(--color-text-muted)">{intro}</p>}
+  </div>
+)}
+
+<form
+  id={id}
+  class:list={[
+    'js-submission-form grid rounded-lg border border-(--color-border) bg-(--color-surface) p-8',
+    contact ? 'gap-6' : 'gap-4',
+    cls,
+  ]}
+  method="post"
+  action={action}
+>
+  <label class={labelCls}>
+    Name
+    <input class={fieldCls} name="name" required autocomplete="name" />
+  </label>
+  <label class={labelCls}>
+    {contact ? 'Work email' : 'Email'}
+    <input class={fieldCls} name="email" type="email" required autocomplete="email" />
+  </label>
+  {contact && (
+    <label class={labelCls}>
+      Organization
+      <input class={fieldCls} name="organization" autocomplete="organization" />
+    </label>
+  )}
+  {!contact &&
+    (role ? (
+      <input type="hidden" name="role" value={role} />
+    ) : (
+      <label class={labelCls}>
+        Role you're interested in
+        <input class={fieldCls} name="role" autocomplete="off" />
+      </label>
+    ))}
+  {!contact && loom && (
+    <label class={labelCls}>
+      Loom intro <span class={hintCls}>required: a short video introducing yourself</span>
+      <input
+        class={fieldCls}
+        name="loom"
+        type="url"
+        required
+        autocomplete="off"
+        placeholder="https://www.loom.com/share/…"
+        pattern="https://(www\.)?loom\.com/.*"
+        title="A loom.com share link"
+      />
+    </label>
+  )}
+  {!contact && (
+    <label class={labelCls}>
+      Links <span class={hintCls}>portfolio, GitHub, LinkedIn</span>
+      <input class={fieldCls} name="links" autocomplete="off" placeholder="https://" />
+    </label>
+  )}
+  <label class={labelCls}>
+    {contact ? 'What are you working on?' : 'Tell us about yourself'}
+    <textarea class={fieldCls} name="message" rows="5" required></textarea>
+  </label>
+
+  {/* Honeypot: hidden from humans and assistive tech; bots fill it and are rejected. */}
+  <div class="hp hidden" aria-hidden="true">
+    <label class={labelCls}>
+      Leave this field empty
+      <input
+        class={fieldCls}
+        name={HONEYPOT_FIELD}
+        tabindex="-1"
+        autocomplete="off"
+        data-1p-ignore
+        data-lpignore="true"
+        data-bwignore
+      />
+    </label>
+  </div>
+
+  {siteKey && (
+    <div
+      class="cf-turnstile"
+      data-sitekey={siteKey}
+      role="group"
+      aria-label="Human verification challenge"
+    />
+  )}
+
+  <button
+    type="submit"
+    class="cursor-pointer rounded-md border-0 bg-(--color-primary) px-[1.2rem] py-[0.85rem] text-base font-semibold text-(--color-primary-contrast) disabled:cursor-progress disabled:opacity-60"
+  >
+    {submitLabel}
+  </button>
+  <p
+    class="text-sm text-(--status-success)"
+    hidden
+    data-status="ok"
+    role="status"
+    aria-live="polite"
+  >
+    {contact
+      ? 'Thanks. We’ll be in touch within one business day.'
+      : 'Thanks. A human reads every application.'}
+  </p>
+  <p
+    class="text-sm text-(--status-danger)"
+    hidden
+    data-status="err"
+    role="alert"
+    aria-live="assertive"
+  >
+    {contact
+      ? 'That didn’t send. Your message is still in the form. Copy it and email us at '
+      : 'That didn’t send. Your answers are still in the form. Copy them and email '}
+    <Email address={fallbackEmail} />.
+  </p>
+
+  {siteKey && (
+    <script is:inline async src="https://challenges.cloudflare.com/turnstile/v0/api.js" />
+  )}
+
+  <script is:inline>
+    (() => {
+      const f = document.currentScript.closest('form');
+      f.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = f.querySelector('button[type="submit"]');
+        if (btn.disabled) return; // a request is already in flight
+        const ok = f.querySelector('[data-status="ok"]');
+        const err = f.querySelector('[data-status="err"]');
+        ok.hidden = true;
+        err.hidden = true;
+        btn.disabled = true;
+        try {
+          const res = await fetch(f.action, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.fromEntries(new FormData(f))),
+          });
+          if (!res.ok) throw new Error('bad status');
+          f.reset();
+          ok.hidden = false;
+        } catch {
+          err.hidden = false;
+        } finally {
+          btn.disabled = false;
+          // A Turnstile token verifies once: a fresh challenge for the next attempt.
+          const w = f.querySelector('.cf-turnstile');
+          if (w && window.turnstile) window.turnstile.reset(w);
+        }
+      });
+    })();
+  </script>
+</form>

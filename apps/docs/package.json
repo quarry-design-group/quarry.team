@@ -1,0 +1,35 @@
+{
+  "name": "@quarry/docs",
+  "version": "3.0.0",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quarry-design-group/quarry.team.git",
+    "directory": "apps/docs"
+  },
+  "type": "module",
+  "description": "Quarry — standalone documentation & user-guide site (Astro Starlight).",
+  "scripts": {
+    "sync": "node scripts/sync-docs.mjs",
+    "prebuild": "node scripts/sync-docs.mjs",
+    "predev": "node scripts/sync-docs.mjs",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.42.10",
+    "astro": "^7.4.11",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@emnapi/runtime": "^1.11.3",
+    "@types/node": "^24",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.162.0"
+  }
+}

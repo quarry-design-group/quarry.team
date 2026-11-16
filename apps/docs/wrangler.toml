@@ -1,0 +1,34 @@
+# Cloudflare Worker (Static Assets) config for the Quarry docs site.
+#
+# The Starlight build (apps/docs/dist) is pure static — no server code, no
+# bindings, no secrets — so this is an assets-only Worker: `[assets].directory`
+# points at the build output and there is no `main`. It serves docs.quarry.team.
+# Cloudflare manages the custom-domain DNS record on deploy (the same pattern as
+# apex/www for apps/web), so Terraform does not own the docs.quarry.team record.
+#
+# Deploy (from apps/docs, after `pnpm --filter @quarry/docs build`):
+#   wrangler deploy
+name = "quarry-docs"
+compatibility_date = "2026-04-15"
+
+# Canonical host only — the docs live at docs.quarry.team, not a workers.dev URL.
+workers_dev = false
+
+# Per-PR previews: `wrangler versions upload` (see preview-docs.yml) publishes a
+# version — no traffic promotion — that Cloudflare serves at an ephemeral,
+# hash-prefixed preview URL. `deploy` still serves the live custom domain below.
+preview_urls = true
+
+routes = [{ pattern = "docs.quarry.team", custom_domain = true }]
+
+# Starlight emits directory-style URLs (…/guides/content-authoring/), so keep
+# Workers Static Assets' default auto-trailing-slash handling — do not switch to
+# drop-trailing-slash here (that is an apps/web choice for its slash-less URLs).
+[assets]
+directory = "./dist"
+# Unknown paths get Starlight's 404.html with a 404 status (the nearest
+# 404.html walking up the path; Starlight emits one at the root).
+not_found_handling = "404-page"
+
+[observability]
+enabled = true

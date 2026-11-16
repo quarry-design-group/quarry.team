@@ -1,0 +1,190 @@
+---
+/**
+ * Motion — an animated image the reader starts and stops (WCAG 2.2.2 Pause,
+ * Stop, Hide, Level A). Renders the clip's still through the image pipeline
+ * with a play control; the animated WebP is fetched only when asked for, and
+ * the same control returns to the still. Nothing moves until the reader acts,
+ * so prefers-reduced-motion needs no special case, and the animation's bytes
+ * stay off the initial page load. Without JavaScript the still stands alone.
+ *
+ * Authoring (MDX), with both files beside the entry:
+ *   import Motion from '@/components/Motion.astro';
+ *   import clip from './image-3.webp';
+ *   import clipPoster from './image-3.poster.webp';
+ *   <Motion src={clip} poster={clipPoster} alt="…" caption="…" />
+ *
+ * `pnpm images:fix` writes the poster (the clip's first frame, same size);
+ * `pnpm images:check` requires it and rejects a clip reached any other way than
+ * through this component, which would autoplay it (scripts/images.mjs).
+ */
+import { Image, getImage } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Props {
+  /** The animated WebP. */
+  src: ImageMetadata;
+  /** Its first frame — `<name>.poster.webp`, written by `pnpm images:fix`. */
+  poster: ImageMetadata;
+  /** Describes the clip, as it would any image — not a label for the section. */
+  alt: string;
+  /** Optional visible caption, rendered as the figure's `<figcaption>`. */
+  caption?: string;
+}
+
+const { src, poster, alt, caption } = Astro.props;
+
+/* The pipeline keeps every frame (it reads animated input whole). Capped at the
+   prose column's 2× width; the poster carries the same aspect ratio, so the swap
+   moves nothing. */
+const clip = await getImage({ src, format: 'webp', width: Math.min(src.width, 1440) });
+
+/* These clips are small (178–500px wide) and are never upscaled: the figure
+   shrink-wraps the still at its intrinsic width and only ever shrinks from
+   there, so the slot is the source width, bounded by the prose column and the
+   viewport. `sizes` says exactly that, which is what lets the browser pick. */
+const slot = Math.min(poster.width, 720);
+const widths = [...new Set([720, 1440].filter((w) => w < poster.width).concat(poster.width))];
+---
+
+<figure data-motion>
+  <div data-motion-frame>
+    <Image
+      src={poster}
+      alt={alt}
+      widths={widths}
+      sizes={`(min-width: ${slot}px) ${slot}px, 100vw`}
+      loading="lazy"
+      decoding="async"
+    />
+    {/* Hidden until the script wires it: a control that cannot act is worse than
+       none. Label text is the state (media-player convention). */}
+    <button
+      type="button"
+      class="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-(--color-border) bg-(--color-surface) text-(--color-text) transition-colors duration-250 ease-out hover:text-(--color-accent) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus)"
+      data-motion-toggle
+      data-clip={clip.src}
+      hidden
+    >
+      <span class="sr-only" data-motion-label>
+        Play animation
+      </span>
+      <svg
+        class="fill-current in-data-playing:hidden"
+        viewBox="0 0 16 16"
+        width="16"
+        height="16"
+        aria-hidden="true"
+      >
+        <path d="M5 3.5v9l8-4.5z"></path>
+      </svg>
+      <svg
+        class="hidden fill-current in-data-playing:block"
+        viewBox="0 0 16 16"
+        width="16"
+        height="16"
+        aria-hidden="true"
+      >
+        <rect x="4" y="3" width="3" height="10" rx="1"></rect>
+        <rect x="9" y="3" width="3" height="10" rx="1"></rect>
+      </svg>
+    </button>
+  </div>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  /* Shrink-wrap the still so the control sits over the image rather than at the
+     far edge of the prose column, and anchor the control to the image alone so
+     a caption cannot push it out of the frame. */
+  figure {
+    width: fit-content;
+    max-width: 100%;
+    margin-block: var(--space-5);
+  }
+  [data-motion-frame] {
+    position: relative;
+  }
+  /* No `width: 100%`: the source is the display size, and stretching a 178px
+     clip across the column is a visible quality regression. Preflight's
+     `max-width: 100%` still fits it to a narrow viewport. */
+  figure :global(img) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-block: 0;
+    border-radius: var(--radius-lg);
+  }
+  figcaption {
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-align: center;
+  }
+  /* The heaviest clip is ~650 KB: on a slow connection the still stands for
+     seconds after the click, so the control says so instead of claiming to
+     play. */
+  figure[data-loading] [data-motion-toggle] {
+    cursor: progress;
+    opacity: 0.6;
+  }
+</style>
+
+<script>
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-motion]')) {
+    const img = figure.querySelector('img');
+    const toggle = figure.querySelector<HTMLButtonElement>('[data-motion-toggle]');
+    const label = figure.querySelector<HTMLElement>('[data-motion-label]');
+    const clip = toggle?.dataset.clip;
+    if (!img || !toggle || !label || !clip) continue;
+
+    const still = {
+      src: img.getAttribute('src') ?? '',
+      srcset: img.getAttribute('srcset'),
+      sizes: img.getAttribute('sizes'),
+    };
+
+    // Bumped on every click, so a fetch the reader has since cancelled cannot
+    // flip the control when it finally lands.
+    let request = 0;
+
+    const stop = () => {
+      request++;
+      figure.removeAttribute('data-loading');
+      figure.removeAttribute('data-playing');
+      toggle.removeAttribute('aria-busy');
+      label.textContent = 'Play animation';
+      img.src = still.src;
+      if (still.srcset) img.setAttribute('srcset', still.srcset);
+      if (still.sizes) img.setAttribute('sizes', still.sizes);
+    };
+
+    const start = async () => {
+      const ticket = ++request;
+      figure.setAttribute('data-loading', '');
+      toggle.setAttribute('aria-busy', 'true');
+      label.textContent = 'Loading animation';
+      img.removeAttribute('srcset');
+      img.removeAttribute('sizes');
+      img.src = clip;
+      // Rejects if the reader stopped it mid-flight (the src changed under it)
+      // or the clip failed to load.
+      const decoded = await img.decode().then(
+        () => true,
+        () => false,
+      );
+      if (ticket !== request) return; // the reader has already stopped it
+      if (!decoded) return stop(); // never loaded — back to the still
+
+      figure.removeAttribute('data-loading');
+      toggle.removeAttribute('aria-busy');
+      figure.setAttribute('data-playing', '');
+      label.textContent = 'Pause animation';
+    };
+
+    toggle.addEventListener('click', () => {
+      if (figure.hasAttribute('data-playing') || figure.hasAttribute('data-loading')) stop();
+      else void start();
+    });
+    toggle.hidden = false;
+  }
+</script>

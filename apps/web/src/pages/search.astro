@@ -1,0 +1,150 @@
+---
+/**
+ * /search — site search on the Worker (ADR-0021).
+ *
+ * Rendered ON DEMAND so the middleware stamps the per-request CSP nonce and
+ * the security headers. The route reads `q` (and `kind`) from
+ * the query string, loads the prerendered index once per isolate through the
+ * assets binding, ranks the query, and renders the form and the results
+ * inside the layout — so search works with JavaScript off. With
+ * `fragment=1` the same route answers with the results block alone, which the
+ * page's island swaps in as the reader types. One index, one ranking
+ * function and one results template serve both modes.
+ *
+ * The route is budgeted per address by a Workers Rate Limiting binding; over
+ * the budget it answers 429 in the same layout (fragment mode: one line).
+ * Result pages stay out of search engines (`noindex, follow`) and, being on
+ * demand, out of the sitemap.
+ */
+export const prerender = false;
+
+// Worker bindings come from the runtime module (ADR-0017).
+import { env as workerEnv } from 'cloudflare:workers';
+import Base from '@/layouts/Base.astro';
+import SearchForm from '@/components/SearchForm.astro';
+import SearchResults from '@/components/SearchResults.astro';
+import { loadSiteIndex, type AssetsBinding } from '@/lib/search/engine';
+import { MIN_QUERY_LENGTH, parseSearchParams, runQuery } from '@/lib/search/query';
+import { RETRY_AFTER_SEC, withinBudget, type SearchEnv } from '@/lib/search/ratelimit';
+import { renderResults, type ResultsState } from '@/lib/search/render';
+
+const env = workerEnv as unknown as SearchEnv & { ASSETS?: AssetsBinding };
+const params = parseSearchParams(Astro.url.searchParams);
+const fragment = Astro.url.searchParams.get('fragment') === '1';
+// cf-connecting-ip is always set by the Cloudflare edge. Never touch Astro's
+// `clientAddress` on this adapter — it is a getter that throws.
+const ip = Astro.request.headers.get('cf-connecting-ip') ?? '';
+
+let state: ResultsState;
+if (params.q.length < MIN_QUERY_LENGTH) {
+  state = { status: 'prompt' };
+} else if (!(await withinBudget(env, ip))) {
+  state = { status: 'rate-limited' };
+  Astro.response.status = 429;
+  Astro.response.headers.set('Retry-After', String(RETRY_AFTER_SEC));
+} else {
+  if (!env.ASSETS) throw new Error('search: the ASSETS binding is missing');
+  const index = await loadSiteIndex(env.ASSETS, Astro.url.origin);
+  state = { status: 'results', outcome: runQuery(index, params) };
+}
+
+if (fragment) {
+  const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' });
+  const retryAfter = Astro.response.headers.get('Retry-After');
+  if (retryAfter) headers.set('Retry-After', retryAfter);
+  return new Response(renderResults(state), { status: Astro.response.status, headers });
+}
+
+const title = state.status === 'results' ? `Search: ${params.q}` : 'Search';
+---
+
+<Base
+  title={title}
+  description="Search Quarry’s case studies, insights, services, open roles and policies by keyword, client, or discipline."
+>
+  <meta slot="head" name="robots" content="noindex, follow" />
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Search</p>
+      <h1 class="mt-3 text-4xl">Find it on the site.</h1>
+      <p class="measure mt-4 text-lg text-(--color-text-muted)">
+        Case studies, insights, services, open roles and policies, ranked by how well they match.
+        Results update as you type.
+      </p>
+
+      <SearchForm params={params} />
+      <p class="sr-only" id="search-live" aria-live="polite"></p>
+      <SearchResults state={state} />
+    </div>
+  </section>
+</Base>
+
+<script>
+  /* Progressive enhancement: results appear as the reader types. The form
+     keeps working as a plain GET; this module fetches the same route's
+     results fragment, swaps it in, and keeps the address bar shareable. The
+     swapped markup carries no scripts, so the page's policy holds unchanged. */
+  const form = document.querySelector<HTMLFormElement>('form[data-search-form]');
+  const input = form?.querySelector<HTMLInputElement>('input[name="q"]');
+  const kind = form?.querySelector<HTMLSelectElement>('select[name="kind"]');
+  const live = document.getElementById('search-live');
+
+  if (form && input && live) {
+    const DEBOUNCE_MS = 200;
+    let timer: number | undefined;
+    let inFlight: AbortController | undefined;
+    let last: string | undefined;
+
+    const results = () => document.getElementById('search-results');
+    const announce = () => {
+      live.textContent = results()?.dataset.summary ?? '';
+    };
+    const swap = (html: string) => {
+      const current = results();
+      const template = document.createElement('template');
+      template.innerHTML = html;
+      const next = template.content.firstElementChild;
+      if (current && next) current.replaceWith(next);
+      announce();
+    };
+
+    const run = async () => {
+      const params = new URLSearchParams();
+      const q = input.value.replace(/\s+/g, ' ').trim();
+      if (q) params.set('q', q);
+      if (kind?.value) params.set('kind', kind.value);
+      const key = params.toString();
+      if (key === last) return;
+      last = key;
+      history.replaceState(null, '', key ? `/search?${key}` : '/search');
+
+      inFlight?.abort();
+      const controller = new AbortController();
+      inFlight = controller;
+      params.set('fragment', '1');
+      try {
+        const res = await fetch(`/search?${params}`, {
+          signal: controller.signal,
+          headers: { accept: 'text/html' },
+        });
+        if (res.ok || res.status === 429) swap(await res.text());
+      } catch {
+        // An aborted or failed fetch leaves the current results in place.
+      }
+    };
+
+    input.addEventListener('input', () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(run, DEBOUNCE_MS);
+    });
+    kind?.addEventListener('change', () => {
+      window.clearTimeout(timer);
+      void run();
+    });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      window.clearTimeout(timer);
+      void run();
+    });
+  }
+</script>

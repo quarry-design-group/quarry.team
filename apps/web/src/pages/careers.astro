@@ -1,0 +1,178 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import LogoWall from '@/components/LogoWall.astro';
+import MarqueePause from '@/components/MarqueePause.astro';
+import SubmissionForm from '@/components/SubmissionForm.astro';
+import { heritageLogos } from '@/lib/site';
+
+const roles = (await getCollection('roles'))
+  .filter((r) => !r.data.draft)
+  .sort((a, b) => a.data.order - b.data.order);
+
+const values: [string, string][] = [
+  [
+    'Focus',
+    'Know what we do well and are impassioned about — and don’t overextend in the pursuit of growth.',
+  ],
+  [
+    'Empower',
+    'Support every member of our team professionally and personally, and close wage, skill, and leadership gaps.',
+  ],
+  [
+    'Diversify',
+    'Build a team that reflects the world, and a leadership that draws from underrepresented communities.',
+  ],
+  [
+    'Lifelong learning',
+    'Continually sharpen our individual crafts and our operation as a collective.',
+  ],
+  [
+    'Balance',
+    'A culture that supports and exemplifies a healthy work/life balance — sustainable pace, real lives.',
+  ],
+  [
+    'Integrity',
+    'We believe in transparency. We look for ways to better serve, without compromise.',
+  ],
+  [
+    'Iteration',
+    'We’re always in beta. We treat missteps as learning, and use mistakes as data that helps us improve.',
+  ],
+  [
+    'Play',
+    'We’re real people who enjoy great music while we work and stay engaged with our communities.',
+  ],
+];
+---
+
+<Base
+  title="Careers: 100% remote, senior, built with intention"
+  description="Join a senior, globally-distributed product collective. 100% remote, flexible hours, generous time off, and real ownership — we hire people who read the source."
+  image="/og/careers.png"
+  imageAlt="We hire people who read the source. 100% remote, senior, global — Quarry careers."
+>
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Careers</p>
+      <h1 class="mt-3 max-w-[18ch] text-4xl">Join our collective.</h1>
+      <p class="measure mt-4 text-lg text-(--color-text-muted)">
+        A skilled and inclusive team, built with intention. Every position is 100% remote with
+        flexible hours and generous time off — we don’t care where or when you work, as long as
+        you’re productive, communicative, and proud of the result.
+      </p>
+      <p class="measure mt-4 text-(--color-text-muted)">
+        The people who make up the Quarry collective are dedicated to our craft, to our clients, and
+        to one another. Our touchstones are kindness, integrity, and transparency, plus the kind of
+        curiosity that opens DevTools on a careers page.
+      </p>
+
+      <div class="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2 min-[62.5rem]:grid-cols-4">
+        {values.map(([t, d]) => (
+          <div class="rounded-lg border border-(--color-border) bg-(--color-surface) p-6">
+            <h2 class="text-lg">{t}</h2>
+            <p class="mt-2 text-sm text-(--color-text-muted)">{d}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="mt-24" id="open-roles">
+        <h2 class="sub mb-6 text-3xl">Open roles</h2>
+        {roles.length > 0 ? (
+          <ul role="list" class="m-0 mb-8 grid list-none gap-3 p-0">
+            {roles.map((r) => (
+              <li>
+                <a
+                  href={`/careers/${r.id}`}
+                  class="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-(--color-border) bg-(--color-surface) p-6 transition-[border-color,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-(--color-border-strong)"
+                >
+                  <div>
+                    <h3 class="text-xl">{r.data.title}</h3>
+                    <p class="mt-1 max-w-[60ch] text-sm text-(--color-text-muted)">
+                      {r.data.summary}
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-3 text-sm text-(--color-text-muted)">
+                    <span class="rounded-full border border-(--color-border-strong) px-[0.6rem] py-[0.15rem] font-mono text-xs tracking-[0.06em] text-(--color-primary) uppercase">
+                      {r.data.team}
+                    </span>
+                    <span>{r.data.location}</span>
+                    <span class="text-lg text-(--color-primary)" aria-hidden="true">
+                      →
+                    </span>
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="mt-3 mb-6 max-w-[60ch] text-(--color-text-muted)">
+            No openings are posted right now, but the form below is always open.
+          </p>
+        )}
+      </div>
+
+      {/* The apply band: a deliberate composition for the page's conversion moment.
+          Mirrors the contact page's intro-rail + form grid; rail goes sticky on
+          desktop so the pitch stays in view while the (tall) form scrolls, offset
+          by --header-height to clear the sticky header. */}
+      <div
+        class="mt-24 grid grid-cols-1 gap-8 min-[56.25rem]:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] min-[56.25rem]:items-start min-[56.25rem]:gap-12"
+        id="apply"
+      >
+        <div class="min-[56.25rem]:sticky min-[56.25rem]:top-[calc(var(--header-height)_+_var(--space-6))]">
+          <p class="eyebrow">Open application</p>
+          <h2 class="mt-3 max-w-[16ch] text-3xl">Don’t see your role?</h2>
+          <p class="mt-4 max-w-[44ch] text-(--color-text-muted)">
+            We hire continuously for exceptional senior people. Tell us what you do best. A human
+            reads every application and replies to the ones that fit.
+          </p>
+          <p class="mt-4 max-w-[44ch] text-sm text-(--color-text-muted)">
+            A concern about our hiring process, or about working here, can be raised through our
+            <a href="/policies/grievances" data-astro-prefetch="false">
+              grievance and concerns process
+            </a>
+            , anonymously if you prefer.
+          </p>
+          <ul class="m-0 mt-8 grid list-none gap-3 p-0 text-sm" role="list">
+            <li class="flex max-w-[40ch] gap-3 text-(--color-text-muted)">
+              <span class="flex-[0_0_7ch] pt-[0.2em] font-mono text-xs tracking-[0.08em] text-(--color-primary) uppercase">
+                Where
+              </span>
+              100% remote, every time zone
+            </li>
+            <li class="flex max-w-[40ch] gap-3 text-(--color-text-muted)">
+              <span class="flex-[0_0_7ch] pt-[0.2em] font-mono text-xs tracking-[0.08em] text-(--color-primary) uppercase">
+                Hours
+              </span>
+              Flexible, with generous time off
+            </li>
+            <li class="flex max-w-[40ch] gap-3 text-(--color-text-muted)">
+              <span class="flex-[0_0_7ch] pt-[0.2em] font-mono text-xs tracking-[0.08em] text-(--color-primary) uppercase">
+                Opener
+              </span>
+              Mentioning you found this page in the console is a good one
+            </li>
+          </ul>
+        </div>
+        {/* Card padding is tighter on small screens so the fields keep usable width. */}
+        <div class="rounded-lg border border-(--color-border) bg-(--color-surface) p-[clamp(var(--space-4),2.5vw,var(--space-6))]">
+          <SubmissionForm kind="careers" submitLabel="Send application" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" data-marquee-scope>
+      <p class="eyebrow">A legacy of innovation</p>
+      <div class="marquee-head">
+        <p class="measure mt-2 mb-6 text-(--color-text-muted)">
+          Our team has come from — and gone on to — industry-leading organizations.
+        </p>
+        <MarqueePause />
+      </div>
+      <LogoWall items={heritageLogos} />
+    </div>
+  </section>
+</Base>

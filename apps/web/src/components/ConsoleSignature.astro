@@ -1,0 +1,54 @@
+---
+/**
+ * ConsoleSignature — a tasteful browser-console message for the curious.
+ * If you open DevTools on an elite firm's site, you should find something
+ * worth finding. This is a wink to great engineers, not a billboard.
+ * Pure inline JS, ~1KB, no dependencies, no tracking.
+ */
+---
+
+<script is:inline>
+  (() => {
+    try {
+      if (typeof console === 'undefined' || !console.log) return;
+      const ink =
+        'color:#FAFAF7;background:#0B0B0A;padding:10px 14px;border-radius:8px;font-size:14px;font-family:ui-monospace,Menlo,monospace';
+      const blue = 'color:#6FA0F5;font-family:ui-monospace,Menlo,monospace;font-size:12px';
+      const ember =
+        'color:#FF5A1F;font-weight:bold;font-family:ui-monospace,Menlo,monospace;font-size:12px';
+      const muted = 'color:#94948A;font-family:ui-monospace,Menlo,monospace;font-size:12px';
+
+      console.log('%cQuarry — built to be inspected.', ink);
+      console.log(
+        '%cYou opened the console. We respect that.%c\n' +
+          'This site ships near-zero JavaScript, hits ~100 Lighthouse,\n' +
+          'and is statically rendered at the edge. The proof is the build.',
+        blue,
+        muted,
+      );
+      console.log(
+        '%c→ You read the source. We should talk.%c careers: https://quarry.team/careers',
+        ember,
+        muted,
+      );
+      // A small machine-readable hello for the equally curious.
+      {
+        console.log('%cPSST:%c try  quarry.hello()', ember, muted);
+        // @ts-expect-error attach to window for the curious
+        window.quarry = {
+          hello() {
+            console.log(
+              '%cYou found the undocumented API. We like you already.\n' +
+                'Small senior team; we build like our names are in the commit log. They are.\n' +
+                'If you read source for fun: careers@quarry.team',
+              blue,
+            );
+            return 'Nice to meet you.';
+          },
+        };
+      }
+    } catch {
+      /* never let a console flourish break the page */
+    }
+  })();
+</script>

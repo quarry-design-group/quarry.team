@@ -1,0 +1,18 @@
+# Legacy SEO continuity (ADR-0011): a wildcard for /cases/* → /work/*, explicit rules for retired cases, and the /policies moves (ADR-0016).
+# NB: do not add trailing-slash variants of these rules — the production edge
+# ignores trailing-slash distinctions in rule sources and keeps the request's
+# slash on the destination (verified live 2026-06; miniflare/wrangler-dev
+# matches them literally, so local testing is misleading). Slashed legacy URLs
+# (/cases/<slug>/) therefore chain 301 → 307 through drop-trailing-slash
+# normalization — an accepted tradeoff, see ADR-0011.
+# Retired case studies: send their legacy URLs to the /work index, not a 404.
+/cases/growing-a-unique-rv-camping-product-from-2mm-arr-to-6mm-arr  /work  301
+/work/growing-a-unique-rv-camping-product-from-2mm-arr-to-6mm-arr   /work  301
+/work/growing-a-travel-brand-from-2m-to-20m-arr  /work/growing-a-travel-membership-from-6k-to-250k-members  301
+/cases/growing-a-travel-brand-from-2m-to-20m-arr  /work/growing-a-travel-membership-from-6k-to-250k-members  301
+/cases/*  /work/:splat  301
+/cases    /work         301
+# Legal pages moved into the /policies section (2026-09; ADR-0016). Permanent
+# redirects so inbound links and contracts that cite the old paths stay whole.
+/privacy  /policies/privacy  301
+/terms    /policies/terms    301

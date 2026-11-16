@@ -1,0 +1,40 @@
+---
+/** Button / link-button. Variants: primary | secondary | ghost. */
+interface Props {
+  href?: string;
+  variant?: 'primary' | 'secondary' | 'ghost';
+  size?: 'md' | 'lg';
+  type?: 'button' | 'submit';
+  class?: string;
+  [key: string]: unknown;
+}
+const {
+  href,
+  variant = 'primary',
+  size = 'md',
+  type = 'button',
+  class: cls,
+  ...rest
+} = Astro.props;
+const Tag = href ? 'a' : 'button';
+
+const base =
+  'inline-flex items-center justify-center gap-2 font-text font-semibold rounded-md border cursor-pointer no-underline transition-[background-color,color,border-color,transform] duration-150 ease-out active:translate-y-px';
+const sizes: Record<string, string> = {
+  md: 'px-[1.15rem] py-[0.7rem] text-base',
+  lg: 'px-[1.6rem] py-[0.9rem] text-lg',
+};
+const variants: Record<string, string> = {
+  primary:
+    'border-transparent bg-(--color-primary) text-(--color-primary-contrast) hover:bg-(--color-primary-hover)',
+  secondary:
+    'border-(--color-border-strong) bg-(--color-surface) text-(--color-text) hover:border-(--color-text)',
+  ghost:
+    'border-transparent bg-transparent text-(--color-primary) hover:bg-[color-mix(in_oklab,var(--color-primary)_8%,transparent)]',
+};
+const classes = [base, sizes[size], variants[variant], cls].filter(Boolean).join(' ');
+---
+
+<Tag class={classes} href={href} type={href ? undefined : type} {...rest}>
+  <slot />
+</Tag>

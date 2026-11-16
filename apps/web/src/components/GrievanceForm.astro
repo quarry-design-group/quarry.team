@@ -1,0 +1,493 @@
+---
+/**
+ * GrievanceForm — the stakeholder concern form. A plain, server-handled form:
+ * it POSTs to its own page, which validates and either redirects to the
+ * confirmation or re-renders this component with field-level errors and the
+ * visitor's text intact. Works with JavaScript disabled; JS only prevents a
+ * double submit and moves focus to the error summary. See ADR-0017.
+ *
+ * Layout: one column in three groups (follow-up, the concern, confirmation)
+ * separated by hairlines, so the eye reads top to bottom with no side-by-side
+ * rows to align. Short answers are capped at a comfortable width; free text
+ * takes the full measure. Type scale: group title > field label > option and
+ * input text > hint.
+ *
+ * Accessibility: every control is labelled; hints and errors are wired via
+ * aria-describedby; invalid fields carry aria-invalid; the error summary is a
+ * focused alert whose links jump to focusable targets (WCAG 3.3.1/3.3.3). The
+ * bot challenge is invisible Turnstile — no puzzle, no checkbox, nothing to see.
+ */
+import Email from '@/components/Email.astro';
+import Select from '@/components/Select.astro';
+import {
+  CATEGORIES,
+  FIELDS,
+  HONEYPOT_FIELD,
+  STAKEHOLDERS,
+  TOKEN_FIELD,
+  type FieldErrors,
+  type FormValues,
+  type Notice,
+} from '@/lib/grievances';
+
+interface Props {
+  values: FormValues;
+  errors: FieldErrors;
+  token: string;
+  siteKey: string;
+  /** A rejection, throttle, or outage notice from the last POST, if any. */
+  notice?: Notice;
+}
+const { values, errors, token, siteKey, notice } = Astro.props;
+
+const labels: Record<(typeof FIELDS)[number], string> = {
+  contact_mode: 'How should we follow up?',
+  name: 'Your name',
+  email: 'Email address',
+  stakeholder: 'Your relationship to Quarry',
+  category: 'What is the concern about?',
+  involves_owner:
+    'This concern involves our Principal personally (the person who handles grievances)',
+  description: 'Describe the concern',
+  desired_outcome: 'What outcome would you like to see?',
+  acknowledge: 'I understand how this submission will be handled, as described above.',
+};
+const errorList = FIELDS.filter((f) => errors[f]).map((f) => ({ id: f, message: errors[f]! }));
+const describedBy = (f: (typeof FIELDS)[number], hasHint: boolean) =>
+  [hasHint ? `${f}-hint` : '', errors[f] ? `${f}-error` : ''].filter(Boolean).join(' ') ||
+  undefined;
+const contactMode = values.contact_mode ?? 'contact';
+const retryMinutes =
+  notice?.kind === 'rejected' && notice.retryAfterSec
+    ? Math.max(1, Math.ceil(notice.retryAfterSec / 60))
+    : 0;
+
+// Control styling. Inputs and the button match SubmissionForm / contact.
+const groupCls = 'grid gap-6 border-t border-(--color-border) pt-8';
+// Group titles take the site's heading face, one step under the page's h2.
+const titleCls =
+  'm-0 mb-1 p-0 [font-family:var(--font-display)] text-xl font-[460] leading-tight tracking-[-0.02em]';
+const labelCls = 'block text-base font-medium';
+const hintCls = 'mt-1 max-w-[60ch] text-sm text-(--color-text-muted)';
+const errCls = 'mt-2 text-sm font-medium text-(--status-danger)';
+// One skin for every field. Inputs and textareas add the md box metrics;
+// selects render through <Select size="md">, which owns the same metrics, the
+// chevron and the height match with the inputs.
+const fieldSkin =
+  'rounded-md border-(--color-border-strong) bg-(--color-bg) text-base leading-[1.6] [font-family:inherit] aria-invalid:border-(--status-danger)';
+const fieldBase = `block w-full border px-[0.85rem] py-[0.7rem] placeholder:text-(--color-text-muted) ${fieldSkin}`;
+const fieldCls = `mt-2 ${fieldBase}`;
+const shortCls = 'max-w-[26rem]';
+const optionCls = 'flex cursor-pointer items-start gap-3 text-base';
+const checkCls = 'mt-[0.2em] h-5 w-5 shrink-0 cursor-pointer accent-(--color-primary)';
+const optional = 'font-normal text-(--color-text-muted)';
+---
+
+<form
+  id="grievance-form"
+  class="grid gap-8 rounded-lg border border-(--color-border) bg-(--color-surface) p-[clamp(var(--space-5),4vw,var(--space-8))]"
+  method="post"
+  action="/policies/grievances#raise"
+  novalidate
+>
+  {errorList.length > 0 && (
+    <div
+      id="form-errors"
+      class="rounded-md border border-(--status-danger) p-4"
+      role="alert"
+      tabindex="-1"
+    >
+      <h3 class="text-lg">
+        {errorList.length === 1
+          ? 'One field needs attention'
+          : `${errorList.length} fields need attention`}
+      </h3>
+      <ul class="mt-2 grid gap-1">
+        {errorList.map((e) => (
+          <li>
+            <a class="underline" href={`#${e.id}`}>
+              {e.message}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )}
+  {notice && (
+    <div
+      id="form-errors"
+      class="rounded-md border border-(--status-danger) p-4"
+      role="alert"
+      tabindex="-1"
+    >
+      {notice.kind === 'unavailable' && notice.reason === 'offline' ? (
+        <p>
+          This form is temporarily offline. Please email <Email address="concerns@quarry.team" />{' '}
+          instead; the same process and timelines apply.
+        </p>
+      ) : notice.kind === 'unavailable' ? (
+        <p>
+          We couldn’t save your submission just now. Your answers are still in the form: try again
+          in a few minutes, or email <Email address="concerns@quarry.team" />.
+        </p>
+      ) : notice.reason === 'rate_limited' ? (
+        <p>
+          Your connection has reached the limit for submissions for now. Try again in about{' '}
+          {retryMinutes} {retryMinutes === 1 ? 'minute' : 'minutes'}, or email{' '}
+          <Email address="concerns@quarry.team" />. Your answers are still in the form.
+        </p>
+      ) : (
+        <p>
+          We couldn’t take that submission. Please try again, or email{' '}
+          <Email address="concerns@quarry.team" />. Your answers are still in the form.
+        </p>
+      )}
+    </div>
+  )}
+
+  {/* Group 1: follow-up. The legend names the radio question and titles the group.
+      tabindex=-1: the error summary links here, and a fieldset is not focusable by default. */}
+  <fieldset class="m-0 grid gap-6 border-0 p-0" id="contact_mode" tabindex="-1">
+    <legend class={titleCls}>{labels.contact_mode}</legend>
+    <div>
+      <p id="contact_mode-hint" class:list={[hintCls, 'mt-0']}>
+        Contact details let us acknowledge, update, and ask follow-up questions. Anonymous
+        submissions are welcome; the limits are described above.
+      </p>
+      {errors.contact_mode && (
+        <p id="contact_mode-error" class={errCls}>
+          {errors.contact_mode}
+        </p>
+      )}
+      <div class="mt-4 grid gap-3">
+        <label class={optionCls}>
+          <input
+            class={checkCls}
+            type="radio"
+            name="contact_mode"
+            value="contact"
+            checked={contactMode === 'contact'}
+            aria-describedby={describedBy('contact_mode', true)}
+          />
+          <span>Contact me by email</span>
+        </label>
+        <label class={optionCls}>
+          <input
+            class={checkCls}
+            type="radio"
+            name="contact_mode"
+            value="anonymous"
+            checked={contactMode === 'anonymous'}
+            aria-describedby={describedBy('contact_mode', true)}
+          />
+          <span>I prefer to stay anonymous</span>
+        </label>
+      </div>
+    </div>
+
+    {/* Contact details apply to the "contact" choice only: the stylesheet below
+         hides them while "anonymous" is checked (no script needed), and the server
+         discards them for anonymous submissions regardless. */}
+    <div class="contact-fields grid gap-6">
+      <div>
+        <label class={labelCls} for="name">
+          {labels.name} <span class={optional}>(optional)</span>
+        </label>
+        <input
+          class:list={[fieldCls, shortCls]}
+          id="name"
+          name="name"
+          type="text"
+          autocomplete="name"
+          maxlength="200"
+          placeholder="Your full name"
+          value={values.name ?? ''}
+          aria-invalid={errors.name ? 'true' : undefined}
+          aria-describedby={describedBy('name', false)}
+        />
+        {errors.name && (
+          <p id="name-error" class={errCls}>
+            {errors.name}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label class={labelCls} for="email">
+          {labels.email}
+        </label>
+        <input
+          class:list={[fieldCls, shortCls]}
+          id="email"
+          name="email"
+          type="email"
+          autocomplete="email"
+          maxlength="320"
+          placeholder="you@example.com"
+          value={values.email ?? ''}
+          aria-invalid={errors.email ? 'true' : undefined}
+          aria-describedby={describedBy('email', false)}
+        />
+        {errors.email && (
+          <p id="email-error" class={errCls}>
+            {errors.email}
+          </p>
+        )}
+      </div>
+    </div>
+  </fieldset>
+
+  {/* Group 2: the concern. */}
+  <div class={groupCls}>
+    <h3 class={titleCls}>About the concern</h3>
+
+    <div>
+      <label class={labelCls} for="stakeholder">
+        {labels.stakeholder}
+      </label>
+      <Select
+        class:list={['mt-2', shortCls]}
+        fieldClass={fieldSkin}
+        id="stakeholder"
+        name="stakeholder"
+        required
+        aria-invalid={errors.stakeholder ? 'true' : undefined}
+        aria-describedby={describedBy('stakeholder', false)}
+      >
+        <option value="" selected={!values.stakeholder}>
+          Choose one
+        </option>
+        {Object.entries(STAKEHOLDERS).map(([key, label]) => (
+          <option value={key} selected={values.stakeholder === key}>
+            {label}
+          </option>
+        ))}
+      </Select>
+      {errors.stakeholder && (
+        <p id="stakeholder-error" class={errCls}>
+          {errors.stakeholder}
+        </p>
+      )}
+    </div>
+
+    <div>
+      <label class={labelCls} for="category">
+        {labels.category}
+      </label>
+      <Select
+        class:list={['mt-2', shortCls]}
+        fieldClass={fieldSkin}
+        id="category"
+        name="category"
+        required
+        aria-invalid={errors.category ? 'true' : undefined}
+        aria-describedby={describedBy('category', false)}
+      >
+        <option value="" selected={!values.category}>
+          Choose one
+        </option>
+        {Object.entries(CATEGORIES).map(([key, label]) => (
+          <option value={key} selected={values.category === key}>
+            {label}
+          </option>
+        ))}
+      </Select>
+      {errors.category && (
+        <p id="category-error" class={errCls}>
+          {errors.category}
+        </p>
+      )}
+    </div>
+
+    {/* The hint sits OUTSIDE the label so it is the description, not part of the name. */}
+    <div>
+      <label class={optionCls} for="involves_owner">
+        <input
+          class={checkCls}
+          id="involves_owner"
+          name="involves_owner"
+          type="checkbox"
+          checked={values.involves_owner === 'on'}
+          aria-describedby="involves_owner-hint"
+        />
+        <span>{labels.involves_owner}</span>
+      </label>
+      <p id="involves_owner-hint" class:list={[hintCls, 'pl-8']}>
+        Ticking this routes your submission to the backup (our Principal Delivery Manager) instead.
+        It is not sent to the Principal.
+      </p>
+    </div>
+
+    <div>
+      <label class={labelCls} for="description">
+        {labels.description}
+      </label>
+      <p id="description-hint" class={hintCls}>
+        What happened, when, and who or what was involved, as far as you’re comfortable sharing. If
+        you have supporting documents, we’ll ask for them through a secure channel once we’ve
+        acknowledged your concern.
+      </p>
+      <textarea
+        class={fieldCls}
+        id="description"
+        name="description"
+        rows="8"
+        required
+        minlength="20"
+        maxlength="10000"
+        placeholder="Start with what happened and when."
+        aria-invalid={errors.description ? 'true' : undefined}
+        aria-describedby={describedBy('description', true)}
+      >{values.description ?? ''}</textarea>
+      {errors.description && (
+        <p id="description-error" class={errCls}>
+          {errors.description}
+        </p>
+      )}
+    </div>
+
+    <div>
+      <label class={labelCls} for="desired_outcome">
+        {labels.desired_outcome} <span class={optional}>(optional)</span>
+      </label>
+      <textarea
+        class={fieldCls}
+        id="desired_outcome"
+        name="desired_outcome"
+        rows="3"
+        maxlength="3000"
+        placeholder="For example: a review of a decision, a change to how we work, or a written response."
+        aria-invalid={errors.desired_outcome ? 'true' : undefined}
+        aria-describedby={describedBy('desired_outcome', false)}
+      >{values.desired_outcome ?? ''}</textarea>
+      {errors.desired_outcome && (
+        <p id="desired_outcome-error" class={errCls}>
+          {errors.desired_outcome}
+        </p>
+      )}
+    </div>
+  </div>
+
+  {/* Group 3: confirmation and submit. */}
+  <div class={groupCls}>
+    <div>
+      <label class={optionCls} for="acknowledge">
+        <input
+          class={checkCls}
+          id="acknowledge"
+          name="acknowledge"
+          type="checkbox"
+          required
+          checked={values.acknowledge === 'on'}
+          aria-invalid={errors.acknowledge ? 'true' : undefined}
+          aria-describedby={describedBy('acknowledge', false)}
+        />
+        <span>{labels.acknowledge}</span>
+      </label>
+      {errors.acknowledge && (
+        <p id="acknowledge-error" class={errCls}>
+          {errors.acknowledge}
+        </p>
+      )}
+    </div>
+
+    {/* Honeypot: bots fill it and are rejected. Kept out of autofill's reach on
+         every axis autofill uses — display:none (browsers do not fill invisible
+         fields), a name and label that match no address, identity, or URL
+         heuristic, autocomplete off, and the password managers' ignore flags —
+         and echoed back on re-render so a resubmitted form trips it again. */}
+    <div class="hidden" aria-hidden="true">
+      <label class={labelCls}>
+        Leave this field empty
+        <input
+          class={fieldCls}
+          name={HONEYPOT_FIELD}
+          value={values[HONEYPOT_FIELD] ?? ''}
+          tabindex="-1"
+          autocomplete="off"
+          data-1p-ignore
+          data-lpignore="true"
+          data-bwignore
+        />
+      </label>
+    </div>
+
+    {/* Signed dwell-time token, bound to the source: proves a real render preceded this POST. */}
+    <input type="hidden" name={TOKEN_FIELD} value={token} />
+
+    {siteKey && (
+      <div
+        class="cf-turnstile"
+        data-sitekey={siteKey}
+        role="group"
+        aria-label="Automated-traffic check"
+      />
+    )}
+
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+      <button
+        type="submit"
+        class="cursor-pointer rounded-md border-0 bg-(--color-primary) px-[1.2rem] py-[0.85rem] text-base font-semibold text-(--color-primary-contrast) disabled:cursor-progress disabled:opacity-60"
+      >
+        Submit concern
+      </button>
+      <p class="m-0 text-sm text-(--color-text-muted)">
+        Prefer email? <Email address="concerns@quarry.team" />
+      </p>
+    </div>
+    <p
+      class="m-0 text-sm text-(--color-text-muted)"
+      role="status"
+      aria-live="polite"
+      data-status
+    ></p>
+  </div>
+
+  {siteKey && (
+    <script is:inline async src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
+  )}
+
+  <style>
+    /* The name and email fields belong to the "contact" choice. Browsers without
+       :has() keep them visible; the server ignores them for anonymous submissions. */
+    fieldset:has(input[name='contact_mode'][value='anonymous']:checked) .contact-fields {
+      display: none;
+    }
+    /* An error re-render arrives as a fresh document at #raise. The site's smooth
+       scrolling would pan from the top of the page down to the form; with the
+       summary present the jump is instant instead. */
+    :global(html:has(#form-errors)) {
+      scroll-behavior: auto;
+    }
+  </style>
+
+  <script is:inline>
+    (() => {
+      const f = document.getElementById('grievance-form');
+      if (!f) return;
+      // Server-side validation failed: put focus on the summary so screen
+      // readers announce it and keyboard users start from the first problem.
+      // The re-render lands at #raise, and the browser's fragment handling
+      // clears focus when the document finishes loading, so the summary is
+      // focused after load (and again on the next frame), not at parse time.
+      const summary = document.getElementById('form-errors');
+      if (summary) {
+        const focusSummary = () => {
+          summary.focus();
+          requestAnimationFrame(() => summary.focus());
+        };
+        if (document.readyState === 'complete') focusSummary();
+        else window.addEventListener('load', focusSummary, { once: true });
+      }
+      // One submit at a time; the server handles the rest.
+      f.addEventListener('submit', () => {
+        const btn = f.querySelector('button[type="submit"]');
+        const status = f.querySelector('[data-status]');
+        if (btn.disabled) return;
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+        if (status) status.textContent = 'Sending your concern…';
+      });
+    })();
+  </script>
+</form>

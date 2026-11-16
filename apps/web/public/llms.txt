@@ -1,0 +1,51 @@
+# Quarry
+
+> Quarry (Quarry Design Group, LLC) is a senior, distributed product &
+> engineering firm. We design, build, and run digital products that move
+> revenue. Founded 2016. Medford, OR + worldwide. $210M+ in client revenue
+> on platforms we've built and maintain.
+
+## Purpose
+Quarry exists to build software that respects the humans on both sides of
+the screen. Products that are accessible to all while protecting privacy,
+attention, and autonomy. Crafted by a distributed collective grounded in
+equity and trust.
+
+## What we do
+- Product ownership & design
+- Full-stack engineering
+- AI development & integration (AI as a product, AI as a feature)
+- eCommerce engineering
+- Data engineering & modernization (privacy-first)
+
+## Key pages
+- [Work](https://quarry.team/work): case studies (real, outcome-led)
+- [Services](https://quarry.team/services): capabilities & engagement models (project, embedded, fractional)
+- [AI Services](https://quarry.team/ai-services): AI development services - agents, retrieval (RAG), and LLM features shipped with evals & guardrails
+- [Compliance](https://quarry.team/compliance): evidence of delivery in regulated environments (HIPAA, PCI DSS, privacy regimes)
+- [How we use AI](https://quarry.team/how-we-use-ai): AI as leverage with senior judgment; deliberate, no slop
+- [Team](https://quarry.team/team): the people (senior alumni of Microsoft, Google, Amazon, Adobe)
+- [Careers](https://quarry.team/careers): open roles and how we hire
+- [Insights](https://quarry.team/blog): writing on product, engineering, data & craft
+- [Contact](https://quarry.team/contact): start a project (reply within one business day)
+- [Policies](https://quarry.team/policies): governance and legal documents, plain language, dated
+- [Grievances & Concerns](https://quarry.team/policies/grievances): raise a concern about our work, anonymously if you prefer; acknowledged within 5 business days
+- [Responsible Marketing & Public Relations Policy](https://quarry.team/policies/responsible-marketing): how we market ourselves and speak publicly - truthful claims, no manipulative patterns, accessible content, opt-in email, AI disclosure
+- [Climate Action Plan](https://quarry.team/policies/climate-action-plan): how we measure, reduce, and report our greenhouse gas emissions - 2026 baseline, Scope 3 focus, reduction targets, efficient software by default
+- [Responsible Lobbying & Public Policy Engagement Policy](https://quarry.team/policies/responsible-lobbying): how we engage on public policy - positive-impact topics only, evidence-based positions, no political contributions, transparent engagement, accountable intermediaries
+- [Justice, Equity, Diversity and Inclusion & Human Rights Policy](https://quarry.team/policies/jedi-human-rights): how we respect human rights and treat people fairly - equal pay for equal work, structured hiring, inclusive remote work, rights-respecting software, vendor and client screening
+
+## Selected case studies
+- [Growing a travel membership from 6,000 to 250,000+ members: an embedded product and engineering partnership since 2018.](https://quarry.team/work/growing-a-travel-membership-from-6k-to-250k-members)
+- [Launching a DTC Shark Tank brand on Shopify: $80k in week-one sales under national-TV traffic.](https://quarry.team/work/launching-a-dtc-shark-tank-brand-on-shopify-to-80k-in-week-one-sales)
+- [Optimizing a membership signup flow: a $40k revenue lift in the first week.](https://quarry.team/work/optimizing-a-membership-signup-flow-into-a-40k-week-one-revenue-lift)
+- [Restructuring data collection for a global gaming brand: data-collection launch builds 7.5x faster.](https://quarry.team/work/restructuring-data-collection-creates-7-5x-faster-launches-for-a-global-gaming-brand)
+- [From siloed tools to a single source of truth: a data platform + self-serve BI for a multi-location pharmacy group.](https://quarry.team/work/from-siloed-tools-to-a-single-source-of-truth-a-data-platform-and-self-serve-bi-for-a-pharmacy-group)
+- [Engineering WM's modern corporate sustainability platform at $0 added infrastructure cost.](https://quarry.team/work/engineering-a-modern-corporate-sustainability-platform-while-maintaining-legacy-content-for-wm)
+
+## Machine-readable indexes
+- Sitemap: https://quarry.team/sitemap-index.xml
+- RSS (Insights): https://quarry.team/rss.xml
+
+## Contact
+hello@quarry.team | 541.249.5441 | https://quarry.team/contact

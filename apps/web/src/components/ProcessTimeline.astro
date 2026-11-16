@@ -1,0 +1,32 @@
+---
+/**
+ * ProcessTimeline — the delivery lifecycle ("What to expect"). The deck's
+ * circular wheel re-expressed as an accessible numbered card grid (ordered list).
+ */
+import type { Phase } from '@/lib/site';
+interface Props {
+  phases: Phase[];
+  class?: string;
+}
+const { phases, class: cls } = Astro.props;
+---
+
+<ol
+  role="list"
+  class:list={[
+    'm-0 grid list-none grid-cols-1 gap-3 p-0 min-[42.5rem]:grid-cols-2 min-[65rem]:grid-cols-3',
+    cls,
+  ]}
+>
+  {phases.map((p, i) => (
+    <li class="flex gap-4 rounded-md border border-(--color-border) bg-(--color-surface) p-6">
+      <span class="inline-flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full border border-(--color-border) font-mono text-sm text-(--color-primary)">
+        {String(i + 1).padStart(2, '0')}
+      </span>
+      <div>
+        <h3 class="text-xl">{p.name}</h3>
+        <p class="mt-1 text-sm text-(--color-text-muted)">{p.items}</p>
+      </div>
+    </li>
+  ))}
+</ol>

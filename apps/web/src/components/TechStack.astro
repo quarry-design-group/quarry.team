@@ -1,0 +1,50 @@
+---
+/**
+ * TechStack — a labeled grid of technologies (icon + name). Each tool carries its
+ * official brand color, which tints the label and border; the icon is rendered as
+ * a CSS mask (so it's recolorable) and goes full brand-color on hover. Brand hues
+ * are mixed with the foreground via color-mix so they stay legible in both themes.
+ */
+import type { Logo } from '@/lib/site';
+import { styleScope } from '@/lib/style-scope';
+interface Props {
+  items: Logo[];
+  class?: string;
+}
+const { items, class: cls } = Astro.props;
+
+/* Per-tool --brand/--icon ride a generated style block keyed by a deterministic
+   scope class — not per-element style attributes, which the strict hash-pinned
+   CSP forbids (ADR-0015). Both vars sit on the <li>; the icon span's mask reads
+   the inherited --icon. */
+const sid = styleScope('ts', JSON.stringify(items.map((t) => [t.color, t.src])));
+const varCss = items
+  .map((t, i) => {
+    const li = `.${sid} > li:nth-child(${i + 1})`;
+    const brand = t.color ? `--brand:${t.color};` : '';
+    return `${li}{${brand}--icon:url('${t.src}')}`;
+  })
+  .join('');
+---
+
+<ul
+  class:list={[
+    'm-0 grid list-none grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3 p-0',
+    sid,
+    cls,
+  ]}
+  role="list"
+>
+  {items.map((t) => (
+    <li class="group flex items-center gap-3 rounded-md border border-[color-mix(in_oklab,var(--brand)_28%,var(--color-border))] bg-(--color-surface) p-4 transition-[border-color,box-shadow,translate] duration-150 ease-out [--brand:var(--color-primary)] hover:-translate-y-0.5 hover:border-[color-mix(in_oklab,var(--brand)_70%,var(--color-border-strong))] hover:shadow-[0_0_0_1px_color-mix(in_oklab,var(--brand)_45%,transparent)] motion-reduce:transition-none motion-reduce:hover:translate-none">
+      <span
+        class="h-6 w-6 flex-none bg-(--color-text-muted) transition-colors duration-150 ease-out [-webkit-mask:var(--icon)_center/contain_no-repeat] [mask:var(--icon)_center/contain_no-repeat] group-hover:bg-(--brand)"
+        aria-hidden="true"
+      />
+      <span class="text-sm font-semibold text-[color-mix(in_oklab,var(--brand)_55%,var(--color-text))]">
+        {t.name}
+      </span>
+    </li>
+  ))}
+</ul>
+<style is:inline set:html={varCss}></style>

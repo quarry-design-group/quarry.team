@@ -1,0 +1,214 @@
+---
+import Base from '@/layouts/Base.astro';
+import CtaBand from '@/components/CtaBand.astro';
+import StatBand from '@/components/StatBand.astro';
+import { firmStats } from '@/lib/site';
+
+// Track record methodology — the public half of the marketing truth policy.
+// Every homepage figure is a floor (rounded down) of a computed value; this
+// page states each formula, its inputs, and its coverage without naming a
+// client. The per-client evidence lives in the internal ledger. Change a
+// figure here only alongside its ledger entry and `firmStats` in site.ts.
+type Method = {
+  value: string;
+  label: string;
+  formula: string;
+  inputs: string[];
+  caveats: string;
+};
+
+const methods: Method[] = [
+  {
+    value: '$210M+',
+    label: 'Client revenue on platforms we built and maintain',
+    formula:
+      'Σ over each platform we built or maintain, Σ over the months of our engagement: completed order revenue net of refunds and cancellations, plus recurring subscription and membership revenue.',
+    inputs: [
+      'Commerce platforms: order totals read directly from each store’s own order database (aggregates only, no customer data), converted to USD at annual average exchange rates.',
+      'Sites without an accessible order system: analytics-reported purchase revenue for the same months.',
+      'Membership platforms: new-member revenue from analytics plus renewals, modeled as monthly cohorts that renew annually at a published 64% first-year membership renewal benchmark. For the largest platform, months before analytics coverage are extrapolated from the client’s publicly reported member counts.',
+      'A subscription platform whose renewals are recorded directly by the client’s server-side tracking, which we implemented: measured recurring revenue.',
+    ],
+    caveats:
+      'Revenue that flowed through platforms we built or maintain — not revenue we claim to have caused. The benchmark renewal rate sits below what the largest client’s public member counts imply, so the membership figures are conservative.',
+  },
+  {
+    value: '$40M+',
+    label: 'Annual client revenue through platforms we maintain today',
+    formula:
+      'Σ over each platform we currently build or maintain: revenue in the trailing twelve months, using the same sources and definitions as the cumulative figure above. For membership and subscription platforms this is their annual recurring revenue.',
+    inputs: [
+      'Commerce platforms: trailing-twelve-month order totals from each store’s order database, net of refunds and cancellations.',
+      'Membership platforms: trailing-twelve-month new-member revenue plus modeled renewals at the 64% benchmark.',
+      'The subscription platform: trailing-twelve-month recurring revenue as recorded by the client’s server-side tracking we implemented.',
+      'Platforms we no longer maintain are excluded.',
+    ],
+    caveats:
+      'A current run-rate, not a forecast. It moves as engagements start and end, and is restated whenever the homepage figures are refreshed.',
+  },
+  {
+    value: '$3M+',
+    label: 'Measured incremental value from improvements we shipped',
+    formula:
+      'Σ of five channels, each measured against a baseline: controlled A/B wins still in production; a post-purchase upgrade flow (take rate above the prior flow’s rate, plus renewals of incremental upgrades); ad-efficiency gains (cost per conversion on a stable conversion action, before vs. after the tracking we implemented went live, × spend since); and revenue through a new product line we built.',
+    inputs: [
+      'A/B win: revenue since the test × lift ÷ (1 + lift) × the net-of-discount share observed in the test.',
+      'Upgrade flow: Σ upgrade revenue × (observed take rate − prior take rate) ÷ observed take rate, plus renewals at a published first-year membership renewal benchmark.',
+      'Ad efficiency: measured before/after cost-per-conversion change on an unchanged conversion action × spend since go-live; published platform benchmarks are used only where no clean before/after exists.',
+    ],
+    caveats:
+      'Most delivered work never gets a holdout, so it cannot be counted here; this is a floor of measured value. Page-speed gains were modeled and excluded: once capped to the evidence, they net to roughly zero across launches.',
+  },
+  {
+    value: '$2.1B+',
+    label: 'Sales across launches whose paid-media measurement we engineered',
+    formula:
+      'Σ over the game titles whose paid-media measurement we built: official units (latest count published while the measurement we built was live) × the title’s average selling price, using the low case of a lifecycle price model.',
+    inputs: [
+      'What we built: the conversion tags, retailer-click and pre-order conversion events, consent management, and server-side conversion APIs that the ad platforms’ bidding optimized on and the publishers’ campaign and budget decisions relied on.',
+      'Units: the publishers’ official unit counts (see the units figure below). Units sold after our work ended are later in each title’s life, so they are priced at the deepest discount bands.',
+      'Price: the publisher’s own disclosed launch sales where they exist; beyond that, the lowest standard list price × an age-based discount schedule (0.95 → 0.30 of list as a title ages), set from the titles’ own disclosed launch sales and observed sale prices.',
+      'Equivalent publisher net revenue, after storefront fees and retail margins: $1.1B+.',
+    ],
+    caveats:
+      'Consumer sales of the titles, not revenue attributed to us: a game’s sales are driven by the game, its IP, and its publisher. The measurement we built is what those campaigns optimized against. A modeled estimate puts the digital paid media running on the conversion signals we implemented at $20M+.',
+  },
+  {
+    value: '65M+',
+    label: 'Units sold across launches we built sites and data for',
+    formula:
+      'Σ over game titles where we built the launch site or the launch measurement and data stack: the publisher’s latest official unit count published while the measurement we built was still live on the title’s site.',
+    inputs: [
+      'Official unit figures only (publisher press releases, earnings statements, and official channels as reported by trade press). Players of free-to-play titles, subscription access, and estimates are excluded.',
+      'Four titles qualify: a 2023 open-world action RPG, a 2019 and a 2023 entry in a flagship fighting franchise, and a 2022 licensed action-adventure.',
+      'Titles where our work was a single tagging or consent task are excluded, as are franchise totals that would double-count individual entries.',
+    ],
+    caveats:
+      'Sales of titles we worked on, stated as fact, not as credit: a game’s sales are driven by the game, its IP, and its publisher. The measurement we built keeps collecting after our hours end, so counts published while it remained live are included. We verified this from each site’s public tag-manager files and archived snapshots: the containers and conversion events we implemented were present when each count was published. Publishers can edit or replace that measurement over time.',
+  },
+  {
+    value: '1.6M+',
+    label: 'Unique viewers of a world esports championship on the official platform we built',
+    formula:
+      'The publisher’s officially reported unique viewers for the flagship international championship held while we were building and maintaining the official esports platform that served as its home.',
+    inputs: [
+      'The publisher’s own press release announcing the championship results (record unique viewership).',
+      'Our build window for the platform, from scoping to handover, which spans the event.',
+    ],
+    caveats:
+      'Viewers watched across streaming platforms, not only on the platform we built; this counts the audience of an event the platform we built served as the official home for, not visits to the site itself. Other championships in the same window reported peak concurrent viewers only and are not added.',
+  },
+  {
+    value: '135M+',
+    label: 'Sessions on sites we built, maintain, or instrumented',
+    formula:
+      'Measured: Σ analytics sessions in each month of our engagement, de-duplicated across overlapping properties, with bot or broken-tag spike months replaced by the median of neighboring months, plus sessions measured from the client’s CDN logs on sites we maintain. Modeled: for every other site we built, maintain, or instrumented, in months with no measured data (including sites whose analytics we can no longer read), monthly sessions estimated from the site’s public Chrome UX Report popularity rank.',
+    inputs: [
+      'Measured (≈50M): analytics reporting APIs and analytics data exports for every client property we can still read, and CDN access logs (bots removed; a session is a visitor and browser pair within a 30-minute window).',
+      'Modeled (≈88M): each rank bucket mapped to the 25th-percentile monthly sessions of 50 client sites where we know both the rank and the real session count (1,531 site-months; leave-one-out error ≈ ×1.7). The top-traffic buckets, above any client in the calibration set, are anchored on a public reference site’s published page views.',
+    ],
+    caveats:
+      'Roughly 64% of the figure is modeled and the low case of the model is used, so the floor holds with about 75% confidence. The model’s central estimate is about 195 million sessions. Most of the modeled traffic comes from game launch months. Months before March 2021 (when Chrome UX Report ranks begin) are extended back to 2019 using each site’s rank in the Tranco research top-sites list, anchored on its own modeled 2021 level. Sites too small to rank count as zero, and pre-2021 launch spikes are understated. Coverage begins when each source’s history begins (2021 at the earliest), so this remains a floor.',
+  },
+  {
+    value: 'Top 5K',
+    label: 'Web traffic rank reached by a site we built or instrumented',
+    formula:
+      'The best monthly popularity rank, in the Chrome UX Report’s public dataset, reached by any client site we built or instrumented, counting only months inside our work on that site.',
+    inputs: [
+      'The Chrome UX Report (Google’s public dataset of real Chrome usage) assigns every site it measures to a popularity bucket: top 1,000, 5,000, 10,000, 50,000, 100,000, and so on, across more than 15 million sites.',
+      'A game launch site whose launch measurement we implemented reached the top-5,000 bucket in its launch month. Eight client sites reached the top 100,000 during our work, including a membership platform we built and maintain.',
+    ],
+    caveats:
+      'A rank bucket, not an exact position. Ranks reached outside our work windows (including a later top-50,000 month for a site we built) are not counted.',
+  },
+  {
+    value: '$230M+',
+    label: 'Combined value of client acquisitions during our partnerships',
+    formula:
+      'Σ over acquisitions and control investments of client companies that closed while we were their partner (or within months of the engagement ending): the publicly disclosed transaction value, or, where terms were undisclosed, an estimate from public figures.',
+    inputs: [
+      'Two publicly reported transactions for one client: a growth-equity investment and, years later, its sale to a public company.',
+      'A client acquired by a public company on undisclosed terms: its publicly reported trailing revenue × 0.32, the low end of the revenue multiple implied by the most comparable public take-private in its sector.',
+      'A software client acquired by a public company shortly after our engagement ended, on undisclosed terms: estimated annual revenue from its publicly reported booking volume and booking fee × 5, the low end of the observed private SaaS valuation range at the time.',
+    ],
+    caveats:
+      'Transactions that happened during our partnerships, stated as fact, not as credit. Our client partners have been acquired four times, three of them by public companies; two of the four values are estimates and are labeled as such in our ledger. Enterprise clients we served through agency partners, including one acquired in a multi-billion-dollar media merger during our work, are excluded: our work there was a slice of one division, so the deal value would overstate our footprint.',
+  },
+];
+
+const rules: string[] = [
+  'Every figure is a floor: the computed value rounded down.',
+  'Only engagements Quarry billed, and only the months we were engaged.',
+  'No client is named or identifiable from a figure, formula, or input on this page.',
+  '“On platforms we built” and “during our partnerships” mean exactly that. We do not claim to have caused a client’s revenue.',
+  'Where data is modeled or extrapolated, the method says so.',
+];
+---
+
+<Base
+  title="Track record: how we count our outcomes"
+  description="The formulas behind Quarry’s track record: what each figure measures, the data it comes from, and what it leaves out. Every figure is a floor."
+>
+  <section class="section pb-16">
+    <div class="container">
+      <p class="eyebrow">Track record</p>
+      <h1 class="mt-4 max-w-[min(20ch,100%)] text-5xl">How we count.</h1>
+      <p class="measure mt-6 text-lg text-(--color-text-muted)">
+        Big numbers are easy to print. These come with their working. Each figure on our homepage is
+        computed from client systems we built or maintain and from public sources, rounded down, and
+        published here with its formula and its limits.
+      </p>
+      <StatBand items={firmStats} class="mt-12" />
+    </div>
+  </section>
+
+  <section class="section py-16">
+    <div class="container">
+      <p class="eyebrow">The rules</p>
+      <h2 class="mt-3 max-w-[20ch] text-3xl">What every figure has to clear.</h2>
+      <ul class="mt-8 m-0 grid list-none gap-4 p-0 md:grid-cols-2" role="list">
+        {rules.map((r) => (
+          <li class="border-l-[3px] border-(--color-primary) pl-4 text-(--color-text-muted)">
+            {r}
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section py-16">
+    <div class="container">
+      <p class="eyebrow">The calculations</p>
+      <h2 class="mt-3 max-w-[20ch] text-3xl">Formula, inputs, limits.</h2>
+      <div class="mt-12 grid grid-cols-1 gap-6">
+        {methods.map((m) => (
+          <article class="rounded-lg border border-(--color-border) bg-(--color-surface) p-8">
+            <p class="font-display text-3xl leading-none">{m.value}</p>
+            <h3 class="mt-2 text-xl">{m.label}</h3>
+            <p class="mt-4">
+              <strong>Formula.</strong> {m.formula}
+            </p>
+            <ul class="mt-3 text-(--color-text-muted)">
+              {m.inputs.map((i) => (
+                <li class="mt-1">{i}</li>
+              ))}
+            </ul>
+            <p class="mt-3 text-sm text-(--color-text-muted)">
+              <strong>Limits.</strong> {m.caveats}
+            </p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="section pt-8">
+    <div class="container">
+      <CtaBand
+        title="Want outcomes you can audit?"
+        sub="Tell us what you’re building. A senior team that measures what it ships replies within one business day."
+      />
+    </div>
+  </section>
+</Base>

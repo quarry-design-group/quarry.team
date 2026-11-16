@@ -1,0 +1,44 @@
+# deps
+node_modules/
+.pnpm-store/
+# build
+dist/
+.astro/
+.output/
+.vercel/
+.wrangler/
+build/
+# env & secrets
+.env
+.env.*
+!.env.example
+# Wrangler local Worker secrets (dev convention) — a real Resend/Turnstile key
+# dropped here for local testing must never be committable.
+.dev.vars
+.dev.vars.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+*.tfstate
+*.tfstate.*
+# test/cache
+coverage/
+playwright-report/
+blob-report/
+test-results/
+.lighthouseci/
+.eslintcache
+# os/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# local verification scratch
+_build/
+_*.mjs
+
+# Operator-local runbooks — never published (one-time ops, repo-meta procedures).
+*.local.md

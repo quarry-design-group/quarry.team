@@ -1,0 +1,243 @@
+---
+import Base from '@/layouts/Base.astro';
+import CtaBand from '@/components/CtaBand.astro';
+import ProcessTimeline from '@/components/ProcessTimeline.astro';
+import { site, type Phase } from '@/lib/site';
+
+/** Service structured data — this is the page that sells the offering, so it
+ *  declares itself as one (provider = the Organization entity Base emits). */
+const serviceLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  name: 'AI development & integration',
+  serviceType: 'AI development services',
+  description:
+    'AI-native product development and LLM feature integration: agents, retrieval (RAG), and AI-powered workflows shipped with evals, guardrails, and privacy-first engineering.',
+  provider: { '@id': `${site.url}/#org` },
+  areaServed: 'Worldwide',
+  url: `${site.url}/ai-services`,
+};
+
+/** The two engagement shapes this page sells: AI as the product, AI as a feature. */
+const modes: { title: string; body: string; capabilities: string[] }[] = [
+  {
+    title: 'AI as the product',
+    body: 'You’re building something AI-native. We take it from concept to launch: model selection, agent architecture, conversational UX, and the unglamorous engineering that turns a demo into a business.',
+    capabilities: [
+      'Agents, copilots & assistants',
+      'Model selection & orchestration',
+      'Conversational & AI-first UX',
+      'Prototype-to-production delivery',
+    ],
+  },
+  {
+    title: 'AI as a feature',
+    body: 'Your product works; you want it smarter. We integrate LLM-powered capability into the software you already run, from search and summarization to support and automation, without destabilizing what already earns.',
+    capabilities: [
+      'LLM features in existing products',
+      'Retrieval (RAG) over your data',
+      'Workflow & back-office automation',
+      'Safe, incremental rollout',
+    ],
+  },
+];
+
+/** The bar: AI that moves a number vs. "AI sauce" — the page's value filter. */
+const earnsItsPlace: string[] = [
+  'Support that resolves tickets, with deflection and satisfaction measured against baseline',
+  'Retrieval that turns institutional knowledge into cited, current answers',
+  'Agents that clear real queues: triage, reconciliation, back-office toil',
+  'Features users choose and pay for: adoption and retention, not a novelty spike',
+];
+const aiSauce: string[] = [
+  'A chatbot so the homepage can say “AI-powered”',
+  'Sparkle-button rewrites bolted on where nobody asked',
+  '“Ask our AI” search that is less effective than what you already had',
+  'An AI label on an if-statement',
+];
+
+/** AI-specific commitments for regulated environments (the generic compliance
+ *  evidence lives at /compliance — this section frames it in AI terms). */
+const regulated: [string, string][] = [
+  [
+    'Your data stays yours',
+    'No training on your data. Vendor data-use terms are vetted before a model sees a token; retrieval corpora live inside your boundary.',
+  ],
+  [
+    'PII enters on our terms',
+    'Minimization and redaction before the context window, retention rules after it. HIPAA-, GDPR-, and CCPA-grade handling by default.',
+  ],
+  [
+    'Decisions you can audit',
+    'Agent actions are traced and logged; consequential calls keep a human in the loop. When someone asks “why did it do that,” there’s an answer.',
+  ],
+  [
+    'Built to the controls',
+    'Compliance designed in from day one, not retrofitted: the same posture that has carried our HIPAA, SOC 2, and PCI work.',
+  ],
+];
+
+/** The discipline that separates shipped AI from a stalled pilot. */
+const principles: [string, string][] = [
+  [
+    'Evals over vibes',
+    'Every AI surface ships with an eval suite and quality gates run against real tasks. If we can’t measure it, we don’t ship it.',
+  ],
+  [
+    'Guardrails & fallbacks',
+    'Bounded tools, graceful degradation, and human-in-the-loop where the stakes demand it. Failure modes are designed, not discovered.',
+  ],
+  [
+    'Cost & latency budgets',
+    'Token spend and response time are engineering budgets, tracked like performance. No surprise invoices, no spinner fatigue.',
+  ],
+];
+
+/** The AI delivery loop — the firm lifecycle, specialized for AI work. */
+const aiLifecycle: Phase[] = [
+  {
+    name: 'Triage',
+    items: 'Use-case mapping · feasibility · risk/ROI · a straight answer if AI isn’t the tool',
+  },
+  { name: 'Data', items: 'Source audit · grounding & retrieval design · privacy review' },
+  { name: 'Prototype', items: 'Model selection · prompt & context engineering · thin-slice build' },
+  { name: 'Evaluate', items: 'Golden sets · eval suites · quality gates against real tasks' },
+  { name: 'Harden', items: 'Guardrails · fallbacks · cost & latency budgets · red-teaming' },
+  { name: 'Ship', items: 'Integration · incremental rollout · observability & tracing' },
+  { name: 'Operate', items: 'Monitoring · drift & regression watch · model upgrades' },
+  { name: 'Improve', items: 'User feedback · eval expansion · capability roadmap' },
+  { name: 'Enable', items: 'Team enablement · playbooks · handover or ongoing ownership' },
+];
+---
+
+<Base
+  title="AI development services: AI as product & feature"
+  description="We design, build, and integrate AI for clients: AI-native products and LLM features shipped with evals, guardrails, and privacy-first engineering."
+  jsonLd={[serviceLd]}
+>
+  {/* Adjacent sections own their padding; trim the seams (pb/pt overrides on
+      .section) to keep the page's vertical rhythm without double-padding. */}
+  <section class="section pb-16">
+    <div class="container">
+      <p class="eyebrow">Capabilities · AI</p>
+      <h1 class="mt-3 text-4xl">AI that survives contact with production.</h1>
+      <p class="measure mt-4 text-lg text-(--color-text-muted)">
+        We develop AI as a product and integrate it as a feature: agents, assistants, and
+        LLM-powered workflows grounded in your data, measured by evals, and engineered with the same
+        rigor as everything else we ship.
+      </p>
+
+      <div class="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2">
+        {modes.map((m) => (
+          <article class="card rounded-lg border border-(--color-border) bg-(--color-surface) p-8">
+            <h2 class="text-2xl">{m.title}</h2>
+            <p class="mt-2 text-(--color-text-muted)">{m.body}</p>
+            <ul class="mt-4 pl-[1.1rem]">
+              {m.capabilities.map((c) => (
+                <li class="my-[0.35rem]">{c}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+
+      <h2 class="sub mt-24 text-3xl">Value you can measure, not AI sauce</h2>
+      <p class="mt-3 max-w-[60ch] text-(--color-text-muted)">
+        “AI-powered” is not a feature. Before we build, every AI surface has to name the number it
+        moves: revenue, resolution rate, cycle time, retention. If it can’t, we’ll say so and build
+        the thing that can.
+      </p>
+      {/* The bar — meaningful value vs. "AI sauce", side by side. */}
+      <div class="bar mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div class="rounded-lg border border-(--color-border) border-t-[3px] border-t-(--color-primary) bg-(--color-surface) px-8 py-6">
+          <h3 class="text-xl">What earns its place</h3>
+          <ul role="list" class="m-0 mt-4 grid list-none gap-3 p-0">
+            {earnsItsPlace.map((item) => (
+              <li class="relative pl-[1.4rem] text-(--color-text-muted) before:absolute before:left-0 before:font-mono before:font-semibold before:text-(--color-accent-ink,--color-accent) before:content-['+']">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div class="rounded-lg border border-(--color-border) border-t-[3px] border-t-(--color-border-strong) bg-(--color-surface) px-8 py-6">
+          <h3 class="text-xl">What we’ll talk you out of</h3>
+          <ul role="list" class="m-0 mt-4 grid list-none gap-3 p-0">
+            {aiSauce.map((item) => (
+              <li class="relative pl-[1.4rem] text-(--color-text-muted) before:absolute before:left-0 before:font-mono before:font-semibold before:text-(--color-text-muted) before:content-['–']">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <h2 class="sub mt-24 text-3xl">The discipline</h2>
+      <p class="mt-3 max-w-[60ch] text-(--color-text-muted)">
+        The gap between an impressive demo and a dependable product is engineering, not magic. This
+        is how we close it. We’ll also tell you plainly when AI is the wrong tool for the job. It’s
+        the same discipline we hold ourselves to: <a href="/how-we-use-ai">see how we use AI</a>.
+      </p>
+      <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        {principles.map(([t, d]) => (
+          <div class="border-l-[3px] border-l-(--color-primary) pl-4">
+            <h3 class="text-xl">{t}</h3>
+            <p class="mt-2 text-(--color-text-muted)">{d}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="section pt-8 pb-12">
+    <div class="container">
+      <h2 class="sub text-3xl">How an AI engagement runs</h2>
+      <p class="mt-3 max-w-[60ch] text-(--color-text-muted)">
+        The same delivery lifecycle we’ve sharpened over a decade of shipping, specialized for AI:
+        evaluation and hardening are first-class phases, not afterthoughts.
+      </p>
+      <ProcessTimeline phases={aiLifecycle} class="mt-8" />
+    </div>
+  </section>
+
+  <section class="section py-8">
+    <div class="container">
+      {/* Regulated environments, in AI terms — the page's dark anchor panel
+          (mirrors the ink panels on /services and /how-we-use-ai). surface-dark
+          supplies the panel's background/text colors via its var scope. */}
+      <div class="surface-dark rounded-xl border border-(--color-ink-panel-border) p-[clamp(1.5rem,1rem+3vw,3.5rem)]">
+        <p class="eyebrow text-blue-300">Built for regulated environments</p>
+        <h2 class="mt-3 max-w-[24ch] text-3xl text-stone-25">
+          Where the rules are non-negotiable, AI needs the most discipline.
+        </h2>
+        <p class="mt-4 max-w-[60ch] text-stone-300">
+          We’ve shipped HIPAA-compliant infrastructure and privacy-first data platforms; the same
+          posture governs every model we put in production. AI raises the stakes, so the guarantees
+          are explicit.
+        </p>
+        <div class="mt-8 grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
+          {regulated.map(([t, d]) => (
+            <div>
+              <h3 class="text-xl text-stone-25">{t}</h3>
+              <p class="mt-2 text-stone-300">{d}</p>
+            </div>
+          ))}
+        </div>
+        <p class="mt-8 text-stone-300">
+          The full alphabet soup, with evidence:
+          <a href="/compliance" class="font-semibold text-blue-300">
+            delivery in regulated environments →
+          </a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section pt-8">
+    <div class="container">
+      <CtaBand
+        title="Have an AI initiative that needs to become real?"
+        sub="Tell us what you’re trying to build, or what stalled. We reply within one business day."
+      />
+    </div>
+  </section>
+</Base>

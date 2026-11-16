@@ -1,0 +1,105 @@
+name: Preview Web (PR)
+
+# Per-PR preview deployments (ADR-0013). Builds the site against the staging
+# environment and uploads a Worker VERSION (no deploy, no traffic promotion) —
+# Cloudflare serves each version at an ephemeral, hash-prefixed preview URL
+# (`preview_urls = true` on [env.staging]). The URL is posted as a sticky PR
+# comment. Staging's own D1 backs the preview, so form tests never touch
+# production data. Previews are noindexed twice over: Cloudflare stamps
+# `X-Robots-Tag: noindex` on every workers.dev preview response, and the Worker
+# entry (apps/web/src/worker.ts) sets `noindex, nofollow` on the same hosts.
+# The URL is public while the PR is open and sits outside the zone's WAF, rate
+# limits and Access policy.
+#
+# Gated with the staging deploys: requires STAGING_DEPLOY_ENABLED=true plus
+# the CLOUDFLARE_* secrets. Previews are for same-repo branches only — GitHub
+# withholds secrets from fork-PR `pull_request` runs, so the job also carries
+# an explicit same-repo guard to skip cleanly (not fail red) on fork PRs.
+# SECURITY: never convert this workflow to `pull_request_target` to "fix"
+# fork previews — that would expose the Cloudflare deploy token to PR code.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/ui/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/preview-web.yml'
+
+concurrency:
+  group: preview-web-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  NODE_VERSION: 24
+  PNPM_VERSION: 10.14.0
+
+jobs:
+  preview:
+    name: Upload preview version
+    runs-on: ubuntu-latest
+    # Same-repo, human-authored PRs only: fork and Dependabot runs both get
+    # no repo secrets, so the wrangler upload can only fail red for them.
+    if: >-
+      ${{ vars.STAGING_DEPLOY_ENABLED == 'true' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build design tokens
+        run: pnpm --filter @quarry/ui build
+      - name: Build site (Astro + Cloudflare adapter, staging env)
+        run: pnpm --filter @quarry/web build
+        env:
+          CLOUDFLARE_ENV: staging
+          SITE_URL: https://staging.quarry.team
+          PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.PUBLIC_TURNSTILE_SITE_KEY }}
+          PUBLIC_TURNSTILE_GRIEVANCES_SITE_KEY: ${{ secrets.PUBLIC_TURNSTILE_GRIEVANCES_SITE_KEY }}
+
+      - name: Upload Worker version (preview)
+        id: upload
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          packageManager: pnpm
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: versions upload -c dist/server/wrangler.json
+
+      - name: Comment preview URL on the PR
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          WRANGLER_OUTPUT: ${{ steps.upload.outputs.command-output }}
+        with:
+          script: |
+            const out = process.env.WRANGLER_OUTPUT ?? '';
+            const url = out.match(/https:\/\/\S+\.workers\.dev\S*/)?.[0];
+            const marker = '<!-- quarry-preview-url -->';
+            const body = url
+              ? `${marker}\n**Web preview deployed** → ${url}\n\n_Ephemeral Worker version of the marketing site (staging env: staging D1; noindexed by the Worker; public while this PR is open, outside the zone WAF and Access). Updated on every push to this PR._`
+              : `${marker}\n**Web preview upload ran, but no preview URL was found in the wrangler output.** Check the workflow logs.`;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            }

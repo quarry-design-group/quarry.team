@@ -1,0 +1,420 @@
+---
+/**
+ * Globe — a slowly auto-rotating WebGL globe (cobe, ~5KB) plotting the team's
+ * locations as pins.
+ *
+ * Markers are NOT cobe's native markers. In the cobe 2.x rewrite, native
+ * markers became flat, hard-edged, camera-facing billboard discs (the marker
+ * fragment shader is a solid `vec4(col, 1.0)` with no falloff) — they read as
+ * 2D stickers floating on the globe rather than dots sitting on the surface.
+ * Instead we overlay our own DOM pins and position them every frame by
+ * replicating cobe's surface→screen projection (`latLonTo3D` + the marker
+ * shader's rotation, GLOBE_R = 0.8). That buys us: soft glowing dots (CSS
+ * radial-gradient, not a flat disc), depth fade (pins hide as they rotate
+ * behind the globe), depth scale (front pins slightly larger → reads 3D), full
+ * theme control, and — unlike cobe's CSS-anchor binding — it works in every
+ * browser (the anchors are positioned with plain `left%/top%`, no CSS anchor
+ * positioning required).
+ *
+ * Each pin is a steady core dot that emits a radar ping: an expanding ring
+ * that fades as it grows, then rests until the next cycle. The core never
+ * changes size or dims — that's what anchors it to the surface; the motion is
+ * all in the ring. Pings are phase-offset per pin by the golden fraction so
+ * the roster pulses asynchronously instead of in unison, and the ping is pure
+ * CSS (per-pin `animation-delay`), so the rAF loop only does projection — no
+ * per-frame style thrash for the pulse.
+ *
+ * Theme-aware (globe recolors in place; pins recolor via a CSS var), and fully
+ * static under prefers-reduced-motion (no rotation, no pings) — honored live,
+ * so mid-session toggles stop or resume the spin without a reload. The bundled
+ * <script> is hydrated by Astro; it reads the marker coordinates from a data
+ * attribute.
+ *
+ * cobe 2.x note: createGlobe no longer runs its own loop or `onRender` — it
+ * returns `{ update, destroy }` and the caller drives each frame via
+ * `globe.update({ phi, ... })`.
+ *
+ * Perf posture: the WebGL buffer renders at a fixed 2× the canvas's CSS size
+ * (native density on dpr-2 displays — see BUFFER_DPR) with MSAA off, and the
+ * globe rebuilds after a lost WebGL context (GPU reset) instead of staying
+ * blank.
+ */
+interface Props {
+  /** [lat, lng] pairs for the pins. */
+  markers: [number, number][];
+  class?: string;
+}
+const { markers, class: cls } = Astro.props;
+---
+
+<div class:list={['relative mx-auto aspect-square w-full max-w-[460px]', cls]}>
+  <!-- Decorative: the section heading + copy convey the meaning. -->
+  <canvas
+    class="globe__canvas aspect-square h-full w-full contain-size contain-layout contain-paint"
+    aria-hidden="true"
+    data-markers={JSON.stringify(markers)}
+  ></canvas>
+  <div class="globe__pins pointer-events-none absolute inset-0" aria-hidden="true"></div>
+  <!--
+    Pin prototype. The script clones this per marker instead of building the
+    nodes with createElement — clones inherit Astro's scoped-style hash
+    (data-astro-cid-*), so the component's scoped `.globe__pin*` rules and the
+    scoped `pin-ping` keyframe actually apply. Nodes built from scratch in JS
+    carry no hash and render unstyled (zero-size, no glow).
+  -->
+  <template class="globe__pin-tpl">
+    <div class="globe__pin absolute top-0 left-0 h-0 w-0 will-change-[transform,opacity]">
+      <span class="globe__pin-dot"></span>
+    </div>
+  </template>
+</div>
+
+<script>
+  import createGlobe, { type Globe } from 'cobe';
+
+  const canvas = document.querySelector<HTMLCanvasElement>('canvas.globe__canvas');
+  const overlay = document.querySelector<HTMLDivElement>('.globe__pins');
+  const pinTpl = document.querySelector<HTMLTemplateElement>('template.globe__pin-tpl');
+  if (canvas && overlay && pinTpl) {
+    const markers: [number, number][] = JSON.parse(canvas.dataset.markers || '[]');
+    // Queried live (not snapshotted): the user may toggle reduced motion
+    // mid-session, and the spin must stop/resume with it — the CSS ping/fade
+    // animations are media-query-gated and follow for free.
+    const reduceMq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const themeMq = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const DEG = Math.PI / 180;
+    const GLOBE_R = 0.8; // cobe's on-screen sphere radius (clip space)
+    const THETA = 0.62; // tilt the north pole toward the viewer
+    const ROTATE_SPEED = 0.0675; // radians/second (~90 s per revolution)
+    const PING_PERIOD_S = 6;
+    const GOLDEN_FRACTION = 0.381966; // 1/φ² — most-irrational phase spacing
+
+    // Pre-rotation surface positions on the GLOBE_R sphere (cobe's
+    // latLonTo3D, prescaled). Only the spin (phi) changes per frame.
+    const dirs = markers.map(([lat, lng]) => {
+      const a = lat * DEG;
+      const b = lng * DEG - Math.PI;
+      const c = Math.cos(a);
+      return [-c * Math.cos(b) * GLOBE_R, Math.sin(a) * GLOBE_R, c * Math.sin(b) * GLOBE_R];
+    });
+
+    // The ping keyframes run on the same period the phases are spaced over.
+    overlay.style.setProperty('--ping-period', `${PING_PERIOD_S}s`);
+
+    // One DOM pin per location; the inner dot carries the CSS ping so the
+    // outer node is free for our projection transform. Cloned from the scoped
+    // <template> (not createElement) so Astro's scoped styles reach the nodes.
+    const pins = markers.map((_, i) => {
+      const pin = pinTpl.content.firstElementChild!.cloneNode(true) as HTMLDivElement;
+      // Negative delay starts each pin partway through the cycle, spaced by the
+      // golden fraction so neighbours never ping in sync.
+      const phase = ((i * GOLDEN_FRACTION) % 1) * PING_PERIOD_S;
+      pin.style.setProperty('--ping-delay', `${-phase}s`);
+      overlay.appendChild(pin);
+      return pin;
+    });
+
+    const isDark = () => {
+      const t = document.documentElement.dataset.theme;
+      return t ? t === 'dark' : themeMq.matches;
+    };
+
+    // Inverted colorways: dark mode = dark ocean + light land + dark glow;
+    // light mode = white ocean + dark land + white glow (blends into the page).
+    const colorsFor = (dark: boolean) => ({
+      dark: dark ? 1 : 0,
+      baseColor: (dark ? [0.22, 0.24, 0.28] : [1, 1, 1]) as [number, number, number],
+      markerColor: (dark ? [0.42, 0.62, 0.98] : [0.15, 0.39, 0.92]) as [number, number, number],
+      glowColor: (dark ? [0.13, 0.15, 0.19] : [1, 1, 1]) as [number, number, number],
+    });
+
+    const applyPinColor = (markerColor: [number, number, number]) => {
+      const rgb = markerColor.map((v) => Math.round(v * 255)).join(' ');
+      overlay.style.setProperty('--pin', `rgb(${rgb})`);
+    };
+
+    let phi = 0;
+    let width = canvas.offsetWidth;
+
+    const cosT = Math.cos(THETA);
+    const sinT = Math.sin(THETA);
+
+    // smoothstep(edge0, edge1, x)
+    const smooth = (e0: number, e1: number, x: number) => {
+      const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+      return t * t * (3 - 2 * t);
+    };
+
+    // Project every pin to the canvas using cobe's exact rotation, then fade
+    // and scale by depth so they sit on the sphere and vanish behind it.
+    const place = () => {
+      const cosP = Math.cos(phi);
+      const sinP = Math.sin(phi);
+      for (let i = 0; i < dirs.length; i++) {
+        const [px, py, pz] = dirs[i];
+        const rx = cosP * px + sinP * pz;
+        const ry = sinP * sinT * px + cosT * py - cosP * sinT * pz;
+        const rz = -sinP * cosT * px + sinT * py + cosP * cosT * pz;
+        const x = (rx + 1) / 2;
+        const y = (-ry + 1) / 2;
+        // depth: 1 on the front face, 0 once safely behind the limb.
+        const depth = smooth(-0.1, 0.18, rz / GLOBE_R);
+        // Grow in / shrink out as a pin crosses the limb, rather than
+        // dissolving at full size — the coherent "went over the horizon"
+        // read. sqrt front-loads the growth so it snaps to size early in the
+        // band then settles (a quick pop, not a slow swell). The small front-
+        // facing bonus keeps the subtle 3D depth cue.
+        const front = (rz / GLOBE_R + 1) / 2; // 0 at the back … 1 dead-front
+        const scale = Math.sqrt(depth) * (0.94 + 0.1 * front);
+        const pin = pins[i];
+        pin.style.opacity = `${depth}`;
+        pin.style.transform = `translate(${x * width}px, ${y * width}px) translate(-50%, -50%) scale(${scale})`;
+        // Skip the ping/paint cost for fully hidden (back-face) pins.
+        pin.style.visibility = depth > 0.001 ? 'visible' : 'hidden';
+      }
+    };
+
+    // cobe's drawing buffer is (width option × devicePixelRatio) device pixels
+    // per axis, and the ratio is frozen at create time — update() can't change
+    // it. A fixed 2 × the canvas's CSS size renders 1:1 on dpr-2 displays and
+    // 2× supersampled on dpr-1, which is all the density the shader can use:
+    // the limb, glow, and every lattice dot are smoothstep-antialiased in the
+    // fragment shader itself. Denser buffers are invisible — on the team-page
+    // hero (1500px CSS canvas) they just re-shade tens of megapixels per
+    // frame — and a constant ratio can't go stale when browser zoom or a
+    // cross-monitor move changes window.devicePixelRatio.
+    const BUFFER_DPR = 2;
+
+    let globe: Globe | undefined;
+    const build = () => {
+      globe = createGlobe(canvas, {
+        devicePixelRatio: BUFFER_DPR,
+        width,
+        height: width,
+        phi,
+        theta: THETA,
+        diffuse: 1.2,
+        // Dense dot lattice sharpens the continents (globe map only — we render
+        // no native cobe markers). The count is deliberate on two axes:
+        //  - <= 32767: cobe 2.x's fragment shader reconstructs each dot's
+        //    position from its index via a binary golden-ratio expansion whose
+        //    hard-coded bits top out at 16384, so dots with index past 32767
+        //    are unrenderable. Fibonacci indices run north->south, so at the
+        //    old 56000 the map simply went blank south of ~10°S.
+        //  - a Fibonacci number (F23): the lattice is a golden-angle spiral,
+        //    and at Fibonacci counts it wraps onto itself almost seamlessly.
+        //    At other counts the wrap mismatch shows as a "zipper" of
+        //    misaligned — or, at unlucky counts like 32000, dropped — dots
+        //    down the Greenwich meridian (through the Sahara).
+        // 28657 = F(23) is the largest Fibonacci number under the cap.
+        mapSamples: 28657,
+        mapBrightness: 6,
+        // MSAA off: the whole globe is one fullscreen quad, so it has no
+        // polygon edges to smooth — it would only add a multisampled buffer
+        // and a per-frame resolve on top of the in-shader antialiasing.
+        // low-power: a decorative background must not wake the discrete GPU
+        // on dual-GPU machines.
+        context: { antialias: false, powerPreference: 'low-power' },
+        ...colorsFor(isDark()),
+      });
+    };
+    build();
+
+    // A lost WebGL context (GPU reset, driver update, device sleep) never
+    // comes back on its own — cobe has no recovery, so the globe would stay
+    // blank while the DOM pins keep animating. preventDefault() opts into
+    // restoration; rebuild once the context returns.
+    canvas.addEventListener('webglcontextlost', (e) => e.preventDefault());
+    canvas.addEventListener('webglcontextrestored', () => {
+      globe?.destroy();
+      build();
+    });
+
+    applyPinColor(colorsFor(isDark()).markerColor);
+    place();
+
+    // Re-sync the canvas buffer + pins on resize only. cobe's update() assigns
+    // canvas.width/height whenever width/height are passed — and assigning a
+    // canvas dimension (even unchanged) resets the drawing buffer — so sending
+    // them per frame would reallocate the buffer 60×/s. While the loop runs,
+    // the new size rides along on the next rAF update (avoids a second,
+    // redundant synchronous render per resize event); with the loop parked
+    // (reduced motion), there is no next frame, so apply it here.
+    let sizeDirty = false;
+    let loopRunning = false;
+    window.addEventListener('resize', () => {
+      width = canvas.offsetWidth;
+      if (loopRunning) {
+        sizeDirty = true;
+      } else {
+        globe?.update({ width, height: width });
+        place();
+      }
+    });
+
+    // Pause the loop while the globe is scrolled out of view — a hero
+    // background doesn't need to keep burning GPU under the roster grid.
+    let inView = true;
+    new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting;
+    }).observe(canvas);
+
+    let last = 0;
+    const frame = (now: number) => {
+      // Park (stop rescheduling) the moment reduced motion is enabled — no
+      // idle rAF ticking for users who asked for stillness. The media-query
+      // listener below restarts the loop if the preference lifts.
+      if (reduceMq.matches) {
+        loopRunning = false;
+        return;
+      }
+      requestAnimationFrame(frame);
+      // Time-based rotation so the speed doesn't scale with the display's
+      // refresh rate; clamp long gaps (tab switch) to avoid a visible jump.
+      const dt = Math.min(now - last, 100);
+      last = now;
+      if (!inView) return;
+      phi += (ROTATE_SPEED * dt) / 1000;
+      if (sizeDirty) {
+        sizeDirty = false;
+        globe?.update({ phi, width, height: width });
+      } else {
+        globe?.update({ phi });
+      }
+      place();
+    };
+    const startLoop = () => {
+      if (loopRunning) return;
+      loopRunning = true;
+      last = performance.now();
+      requestAnimationFrame(frame);
+    };
+    if (!reduceMq.matches) startLoop();
+    reduceMq.addEventListener('change', () => {
+      if (!reduceMq.matches) startLoop();
+    });
+
+    // Recolor in place on theme toggle and (if no explicit choice) OS theme
+    // change — no rebuild needed, so the rotation stays continuous.
+    const applyTheme = () => {
+      const c = colorsFor(isDark());
+      globe?.update({ dark: c.dark, baseColor: c.baseColor, glowColor: c.glowColor });
+      applyPinColor(c.markerColor);
+    };
+    new MutationObserver(applyTheme).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+    themeMq.addEventListener('change', () => {
+      if (!document.documentElement.dataset.theme) applyTheme();
+    });
+  }
+</script>
+
+<style>
+  /* Residual CSS: the fade-in choreography (keyframes + live reduced-motion
+     overrides), the pin dot/ping system (gradient core, cutout ring, radar
+     ping, @supports fallback) — layout moved to utilities on the markup. */
+  .globe__canvas {
+    opacity: 0;
+    transition: opacity var(--dur-3) var(--ease-out);
+    animation: globe-in var(--dur-3) var(--ease-out) forwards;
+  }
+  @keyframes globe-in {
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* DOM marker overlay — see the component header for why pins aren't native.
+     Fades in with the globe. */
+  .globe__pins {
+    opacity: 0;
+    animation: globe-in var(--dur-3) var(--ease-out) forwards;
+  }
+  .globe__pin-dot {
+    /* Scale the dot with the viewport: the globe is sized in vw by its host,
+       so a fixed px dot balloons on a small globe. Ramps 8px (phones) → 12px
+       (>=~1000px), holding the desktop size the design was tuned at. */
+    --size: clamp(8px, 5.4px + 0.66vw, 12px);
+    position: relative;
+    display: block;
+    width: var(--size);
+    height: var(--size);
+    margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
+    border-radius: 50%;
+    /* Soft glowing dot (not a flat disc): a fairly solid core keeps it from
+       dissolving into cobe's continent-dot lattice, then it fades to a halo.
+       The core is deliberately steady — no size or opacity animation — so the
+       pin reads as fixed to the surface; the radar ring carries the motion. */
+    background: radial-gradient(
+      circle,
+      var(--pin, var(--blue-300)) 0%,
+      var(--pin, var(--blue-300)) 44%,
+      color-mix(in srgb, var(--pin, var(--blue-300)) 55%, transparent) 64%,
+      transparent 82%
+    );
+    /* Cutout ring in the page background colour gives the pin a hard edge
+       against the map dots wherever they overlap (it vanishes over matching
+       background, so it only shows where separation is needed), then a soft
+       coloured halo for the glow. */
+    box-shadow:
+      0 0 0 1.5px var(--color-bg),
+      0 0 9px 2px color-mix(in srgb, var(--pin, var(--blue-300)) 60%, transparent);
+  }
+  /* Radar ping: a ring born at the dot's edge expands to ~2.7× while fading,
+     then the pin rests for the remainder of the cycle — beacon, not strobe.
+     Ease-out front-loads the expansion, like a real radar sweep dissipating. */
+  .globe__pin-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--pin, var(--blue-300));
+    opacity: 0;
+    animation: pin-ping var(--ping-period) ease-out infinite;
+    animation-delay: var(--ping-delay, 0s);
+  }
+  @keyframes pin-ping {
+    0% {
+      transform: scale(0.7);
+      opacity: 0;
+    }
+    /* Quick fade-in while the ring is still inside the core's halo, so rings
+       materialize out of the glow instead of popping in. */
+    8% {
+      opacity: 0.55;
+    }
+    45% {
+      transform: scale(2.7);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(2.7);
+      opacity: 0;
+    }
+  }
+  /* Engines without color-mix() drop the whole gradient/box-shadow at
+     computed-value time (the declarations contain var(), so they parse but
+     compute to unset — a stacked plain fallback declaration would NOT kick
+     in). Give them a solid dot + cutout so the ping ring never orbits an
+     invisible core. */
+  @supports not (background: color-mix(in srgb, red 50%, transparent)) {
+    .globe__pin-dot {
+      background: var(--pin, var(--blue-300));
+      box-shadow: 0 0 0 1.5px var(--color-bg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .globe__canvas,
+    .globe__pins {
+      animation: none;
+      opacity: 1;
+    }
+    .globe__pin-dot::after {
+      animation: none;
+      opacity: 0;
+    }
+  }
+</style>

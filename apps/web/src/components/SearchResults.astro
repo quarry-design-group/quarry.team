@@ -1,0 +1,27 @@
+---
+/**
+ * SearchResults — the results block of the search page. The markup comes
+ * from `renderResults` (src/lib/search/render.ts), the same function the
+ * route uses to answer fragment requests, so the page and the island's swaps
+ * are one template. Every string in it is escaped there; `<mark>` is the only
+ * markup the query contributes.
+ */
+import { renderResults, type ResultsState } from '@/lib/search/render';
+
+interface Props {
+  state: ResultsState;
+}
+const { state } = Astro.props;
+---
+
+<Fragment set:html={renderResults(state)} />
+
+<style is:global>
+  /* Matched terms: the accent as ink, no highlight fill — legible in both
+     themes at AA and free of the browser's yellow default. */
+  #search-results mark {
+    background: transparent;
+    color: var(--color-accent-ink);
+    font-weight: 600;
+  }
+</style>

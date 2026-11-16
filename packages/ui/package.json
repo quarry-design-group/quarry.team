@@ -1,0 +1,29 @@
+{
+  "name": "@quarry/ui",
+  "version": "3.0.0",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quarry-design-group/quarry.team.git",
+    "directory": "packages/ui"
+  },
+  "type": "module",
+  "description": "Quarry 'Quarried' design system — design tokens (tokens.json -> tokens.css + figma.tokens.json) and typed token exports.",
+  "exports": {
+    "./tokens.css": "./tokens/tokens.css",
+    "./tokens.json": "./tokens/tokens.json",
+    "./tokens": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsx src/build-tokens.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vitest": "^5.1.0"
+  }
+}

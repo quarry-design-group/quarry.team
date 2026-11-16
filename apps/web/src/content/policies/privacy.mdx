@@ -1,0 +1,36 @@
+---
+title: 'Privacy Policy'
+summary: 'How Quarry handles data on quarry.team: privacy-first cookieless analytics, no ad-tech or cross-site tracking, and form details kept only for their purpose.'
+category: legal
+updated: 2026-09-27
+order: 10
+sitemap: false
+---
+
+import Email from '@/components/Email.astro';
+import { site } from '@/lib/site';
+
+## Our approach
+
+We sell privacy-forward data thinking, so we practice it. This site uses privacy-first, cookieless analytics (Cloudflare Web Analytics). We do not set advertising cookies, we do not sell your data, and we do not track you across the web. No cookie banner is needed because we don’t use the cookies that would require one.
+
+## What we collect
+
+- **Aggregate, anonymous analytics**: page views and performance, with no personal identifiers.
+- **Information you send us**: if you submit the contact or careers form, we receive the details you provide (name, email, your organization or the role you’re applying for, any links, and your message) so we can reply, along with a Cloudflare Turnstile token that confirms a person sent them; we verify the token with Cloudflare and discard it.
+- **Abuse triage data**: for each form submission we keep the network prefix of the request (the first three parts of an IPv4 address, or the first three groups of an IPv6 address) and a keyed one-way hash of the full address. They let us spot repeated abuse without storing the address itself; the grievance intake keeps a hash of the same kind under a separate key.
+- **Grievances and concerns**: if you <a href="/policies/grievances" data-astro-prefetch="false">raise a concern</a>, we receive what you choose to tell us. Contact details are optional; you can submit anonymously.
+
+## How we use it
+
+Solely to operate and improve the site, to respond to your inquiry, or to look into and resolve a concern you raise. Form submissions are verified by Cloudflare Turnstile, stored in our Cloudflare-hosted database, and relayed to us by our email provider (Resend). Contact and careers submissions are used only to follow up with you, and are deleted, along with the notification emails that relayed them, 36 months after we receive them. If you book a call, scheduling runs through Calendly under its own privacy policy.
+
+Grievance submissions are held in the same Cloudflare-hosted database and mirrored to our internal tracking log in Notion, which is restricted to Quarry’s leadership team. They are shared inside Quarry only with the people who need them to act on the concern, and are kept for three years after the concern is closed, then deleted. Submissions our spam filters set aside are reviewed by a person and never silently discarded.
+
+## Your choices
+
+You can request access to, or deletion of, any information you’ve sent us by emailing <Email address={site.email} />. For a concern you raised, quote your reference number.
+
+## Contact
+
+{site.legalName}, {site.address.street}, {site.address.city}, {site.address.region} {site.address.postalCode} · <Email address={site.email} />

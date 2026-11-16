@@ -1,0 +1,1295 @@
+---
+/**
+ * ArchitectureDiagram — an explorable architecture diagram for long-form
+ * content (case studies), rendered at build time as inline SVG from a typed
+ * data file (`src/lib/diagram.ts`). It replaces a raster export: the text is
+ * real (selectable, searchable, crisp at any zoom), the colours are the theme's
+ * semantic tokens, and the faces are the brand's.
+ *
+ * Three tiers, each complete without the next:
+ * 1. Zero JS. Every node is a button that opens a detail card through the
+ *    native Popover API. Hovering or focusing a node highlights that node;
+ *    while its card is open, every path through it lights in CSS (`:has()`).
+ *    Below the breakpoint the diagram scrolls in its own region. A "read as text"
+ *    disclosure lists each path in order: the text alternative.
+ * 2. Expand. A small script reveals an Expand button that moves the diagram
+ *    into a full-screen native modal `<dialog>` (the ImageZoom pattern), so
+ *    focus is trapped and restored and Escape closes it.
+ * 3. Zoom and pan in that dialog: + / − / Fit controls, the + − 0 keys,
+ *    Ctrl/⌘-wheel and trackpad pinch, and drag-to-pan with a mouse; arrow keys
+ *    and touch keep the browser's own scrolling and pinch. No dependencies.
+ *    It shares the expand script, so it costs no extra request (ADR-0002).
+ *
+ * The SVG carries geometry as attributes only and styles through classes, so
+ * the markup needs no `style=""` and no generated style block (ADR-0015); the
+ * script sizes things through CSSOM only, which the CSP permits.
+ *
+ * Authoring (MDX), with the data file beside the entry:
+ *   import ArchitectureDiagram from '@/components/ArchitectureDiagram.astro';
+ *   import architecture from './architecture';
+ *   <ArchitectureDiagram diagram={architecture} />
+ */
+import { layoutDiagram, type Diagram } from '@/lib/diagram';
+
+interface Props {
+  diagram: Diagram;
+}
+
+const { diagram } = Astro.props;
+const layout = layoutDiagram(diagram);
+const id = diagram.id;
+const titleId = `${id}-title`;
+const cardId = (nodeId: string) => `${id}-card-${nodeId}`;
+const laneNumber = (i: number) => String(i + 1).padStart(2, '0');
+/** Inset of a node's button inside its foreignObject: room for the focus ring. */
+const RING = 6;
+const notes = layout.nodes.filter((n) => n.note);
+/** Each container's labels from the outermost in, for the text alternative. */
+const parentOfBox = new Map(layout.containers.flatMap((c) => c.childIds.map((k) => [k, c])));
+const boxPath = (c: (typeof layout.containers)[number]) => {
+  const path = [c.label];
+  for (let at = parentOfBox.get(c.id); at; at = parentOfBox.get(at.id)) path.unshift(at.label);
+  return path.join(' › ');
+};
+/** Badge type, in viewBox units: JetBrains Mono advances 0.6em per glyph. */
+const BADGE = { size: 14, tracking: 14 * 0.14, pad: 8 };
+const badgeWidth = (text: string) =>
+  text.length * (BADGE.size * 0.6 + BADGE.tracking) - BADGE.tracking + BADGE.pad * 2;
+const flowsThrough = (slots: string[]) =>
+  layout.flows.filter((f) => slots.includes(f.slot)).map((f) => f.label);
+---
+
+<figure class:list={['dg', { 'dg--wide': diagram.floor === 'wide' }]} data-dg>
+  <figcaption class="dg-caption">
+    {diagram.kicker && <span class="dg-kicker">{diagram.kicker}</span>}
+    <span class="dg-title" id={titleId}>
+      {diagram.title}
+      {diagram.subtitle && ' '}
+      {diagram.subtitle && <span class="dg-subtitle">{diagram.subtitle}</span>}
+    </span>
+  </figcaption>
+
+  <div class="dg-bar">
+    <p class="dg-hint">
+      Select a step for its details.
+      <span class="dg-hint-scroll"> Scroll sideways for the rest.</span>
+    </p>
+    {/* Hidden until the script wires it: a control that cannot act is worse than none. */}
+    <button type="button" class="dg-control" data-dg-expand aria-haspopup="dialog" hidden>
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" class="dg-icon">
+        <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"></path>
+      </svg>
+      Expand<span class="sr-only"> diagram</span>
+    </button>
+  </div>
+
+  <div class="dg-home" data-dg-home role="region" aria-labelledby={titleId}>
+    <div class="dg-stage" data-dg-stage>
+      <svg
+        class="dg-svg"
+        data-dg-svg
+        viewBox={`${layout.minX} ${layout.minY} ${layout.width} ${layout.height}`}
+        width={layout.width}
+        height={layout.height}
+        role="group"
+      >
+        <defs>
+          <marker
+            id={`${id}-arrow`}
+            viewBox="0 0 10 10"
+            refX="1"
+            refY="5"
+            markerWidth="10"
+            markerHeight="10"
+            markerUnits="userSpaceOnUse"
+            orient="auto-start-reverse"
+          >
+            <path class="dg-arrow" d="M0 1L9 5L0 9Z"></path>
+          </marker>
+        </defs>
+
+        {/* Containers, outermost first, behind everything. Decorative to
+            assistive technology, which gets the nesting from each node's card
+            and the text alternative's list of boundaries. */}
+        {layout.containers.length > 0 && (
+          <g aria-hidden="true">
+            {layout.containers.map((box) => (
+              <g class:list={['dg-box', `dg-box--${box.kind}`]}>
+                <rect x={box.x} y={box.y} width={box.w} height={box.h} rx="12" />
+                <text class="dg-box-label" x={box.x + 14} y={box.y + 18}>
+                  {box.label}
+                </text>
+              </g>
+            ))}
+          </g>
+        )}
+
+        {/* Connectors next, so nodes paint over them; decorative to assistive
+            technology, which reads the paths from the text alternative and
+            each node's card instead. A return path is dashed. */}
+        <g aria-hidden="true">
+          {layout.edges.map((edge) => (
+            <path
+              class:list={['dg-edge', { 'dg-edge--return': edge.isReturn }, ...edge.flowSlots]}
+              d={edge.d}
+              marker-end={`url(#${id}-arrow)`}
+            />
+          ))}
+          {layout.edges
+            .filter((edge) => edge.label)
+            .map((edge) => (
+              <text
+                class:list={['dg-return-label', ...edge.flowSlots]}
+                x={edge.label!.x}
+                y={edge.label!.y}
+                text-anchor="middle"
+              >
+                {edge.label!.text}
+              </text>
+            ))}
+        </g>
+
+        {/* One group per lane, named by its heading, holding its nodes in reading
+            order (WCAG 1.3.1, 1.3.2); a labelled node group nests inside it. */}
+        {layout.lanes.map((lane, i) => (
+          <g role="group" aria-labelledby={`${id}-lane-${lane.id}`}>
+            <text class="dg-lane" id={`${id}-lane-${lane.id}`} x={40} y={lane.labelY}>
+              {`${laneNumber(i)} · ${lane.label}`}
+            </text>
+            {lane.items.map((item, k) => {
+              const group = 'group' in item ? item.group : undefined;
+              const members = group ? group.nodes : 'node' in item ? [item.node] : [];
+              const groupId = `${id}-lane-${lane.id}-group-${k}`;
+              return (
+                <g role={group ? 'group' : undefined} aria-labelledby={group ? groupId : undefined}>
+                  {group && (
+                    <text class="dg-group" id={groupId} x={group.x} y={group.y}>
+                      {group.label}
+                    </text>
+                  )}
+                  {members.map((node) => (
+                    <g class:list={['dg-node', ...node.flowSlots]}>
+                      <foreignObject
+                        class="dg-fo"
+                        x={node.x - RING}
+                        y={node.y - RING}
+                        width={node.w + RING * 2}
+                        height={node.h + RING * 2}
+                      >
+                        <button
+                          type="button"
+                          class:list={['dg-btn', `dg-btn--${node.kind ?? 'step'}`]}
+                          popovertarget={cardId(node.id)}
+                        >
+                          <span class="dg-btn-title">{node.title}</span>
+                          {node.detail && <span class="dg-btn-detail">{node.detail}</span>}
+                          {node.badge && <span class="sr-only">{`(${node.badge})`}</span>}
+                        </button>
+                      </foreignObject>
+                      {/* The focus ring, drawn in SVG with a non-scaling stroke so it
+                          stays 3 CSS px at any zoom (WCAG 2.4.13). The badge paints
+                          over it and, while focused, takes the same stroke, so the
+                          ring reads as one unbroken line around node and badge. */}
+                      <rect
+                        class="dg-ring"
+                        x={node.x - 5}
+                        y={node.y - 5}
+                        width={node.w + 10}
+                        height={node.h + 10}
+                        rx="14"
+                        aria-hidden="true"
+                      />
+                      {node.badge && (
+                        <g class="dg-badge" aria-hidden="true">
+                          <rect
+                            x={node.x + 14}
+                            y={node.y - 10}
+                            width={badgeWidth(node.badge)}
+                            height="20"
+                            rx="3"
+                          />
+                          {/* Centred; the nudge offsets the trailing letter-spacing
+                              that text-anchor counts as part of the text. */}
+                          <text
+                            x={node.x + 14 + badgeWidth(node.badge) / 2 + BADGE.tracking / 2}
+                            y={node.y + 5}
+                            text-anchor="middle"
+                          >
+                            {node.badge}
+                          </text>
+                        </g>
+                      )}
+                      {node.note && (
+                        <text
+                          class:list={['dg-note', `dg-note--${node.note.tone ?? 'primary'}`]}
+                          x={node.x}
+                          y={node.y + node.h + 28}
+                        >
+                          {node.note.text}
+                        </text>
+                      )}
+                    </g>
+                  ))}
+                </g>
+              );
+            })}
+          </g>
+        ))}
+
+        {layout.footer && (
+          <g>
+            <line
+              class="dg-rule"
+              x1={40}
+              x2={layout.minX + layout.width - 40}
+              y1={layout.footer.y}
+              y2={layout.footer.y}
+            />
+            <foreignObject
+              x={40}
+              y={layout.footer.y + 8}
+              width={layout.minX + layout.width - 80}
+              height={52}
+            >
+              <div class="dg-foot">
+                <span class="dg-foot-label">{layout.footer.label}</span>
+                <ul class="dg-foot-items" role="list">
+                  {layout.footer.items.map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </foreignObject>
+          </g>
+        )}
+      </svg>
+
+      {layout.nodes.map((node) => (
+        <div
+          popover
+          id={cardId(node.id)}
+          class:list={['dg-card', ...node.flowSlots]}
+          role="dialog"
+          aria-labelledby={`${cardId(node.id)}-title`}
+        >
+          {/* Compact, so it fits under the diagram on a laptop screen: the
+              close control shares the heading row, and the paths take one line. */}
+          <div class="dg-card-head">
+            <div>
+              <p class="dg-card-kicker">{[node.laneLabel, ...node.containerPath].join(' › ')}</p>
+              <p class="dg-card-title" id={`${cardId(node.id)}-title`}>
+                {node.title}
+              </p>
+              {node.detail && <p class="dg-card-detail">{node.detail}</p>}
+            </div>
+            <button
+              type="button"
+              class="dg-control dg-card-close"
+              popovertarget={cardId(node.id)}
+              popovertargetaction="hide"
+            >
+              Close<span class="sr-only">{` ${node.title} details`}</span>
+            </button>
+          </div>
+          {node.description.map((para) => (
+            <p class="dg-card-body">{para}</p>
+          ))}
+          <p class="dg-card-paths">
+            <span class="dg-card-paths-label">
+              {node.flowSlots.length > 1 ? 'On the paths' : 'On the path'}
+            </span>
+            {flowsThrough(node.flowSlots).join(' · ')}
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  <details class="dg-text">
+    <summary>Read the diagram as text</summary>
+    <ol class="dg-text-flows">
+      {layout.flows.map((flow) => (
+        <li>
+          <span class="dg-text-flow">{flow.label}</span>
+          {flow.returnLabel && <span>{` (loops back: ${flow.returnLabel})`}</span>}
+          <ol class="dg-text-steps">
+            {flow.steps.map((stepId) => {
+              const node = layout.nodes.find((n) => n.id === stepId)!;
+              return <li>{node.detail ? `${node.title}: ${node.detail}` : node.title}</li>;
+            })}
+          </ol>
+        </li>
+      ))}
+    </ol>
+    {layout.containers.some((c) => c.nodeTitles.length > 0) && (
+      <>
+        <p class="dg-text-boxes-head">Boundaries</p>
+        <ul class="dg-text-boxes">
+          {layout.containers
+            .filter((c) => c.nodeTitles.length > 0)
+            .map((c) => (
+              <li>{`${boxPath(c)}: ${c.nodeTitles.join(', ')}`}</li>
+            ))}
+        </ul>
+      </>
+    )}
+    {notes.length > 0 && (
+      <ul class="dg-text-notes">
+        {notes.map((node) => (
+          <li>{`${node.title}: ${node.note!.text}`}</li>
+        ))}
+      </ul>
+    )}
+    {layout.footer && (
+      <p class="dg-text-foot">{`${layout.footer.label}: ${layout.footer.items.join(', ')}.`}</p>
+    )}
+  </details>
+
+  <dialog class="dg-dialog" data-dg-dialog aria-labelledby={`${id}-dialog-title`}>
+    <div class="dg-dialog-bar">
+      <p class="dg-dialog-title" id={`${id}-dialog-title`}>
+        {diagram.title}
+      </p>
+      <div class="dg-zoom" role="group" aria-label="Zoom">
+        <button
+          type="button"
+          class="dg-control dg-control--glyph"
+          data-dg-zoom="out"
+          aria-label="Zoom out"
+        >
+          −
+        </button>
+        <output class="dg-level" data-dg-level aria-live="polite">
+          100%
+        </output>
+        <button
+          type="button"
+          class="dg-control dg-control--glyph"
+          data-dg-zoom="in"
+          aria-label="Zoom in"
+        >
+          +
+        </button>
+        <button type="button" class="dg-control" data-dg-zoom="fit">
+          Fit
+        </button>
+      </div>
+      <button type="button" class="dg-control" data-dg-close>
+        Close
+      </button>
+    </div>
+    {/* The diagram is moved in here while the dialog is open. */}
+    <div
+      class="dg-viewport"
+      data-dg-viewport
+      role="region"
+      aria-label="Diagram. Arrow keys or drag to pan; plus, minus and zero to zoom."
+      tabindex="0"
+      autofocus
+    ></div>
+  </dialog>
+</figure>
+
+<style>
+  /* Residual: an SVG drawn from data. Geometry is attributes; every colour and
+     face here is a token. Sizes inside the SVG (font-size, stroke) are viewBox
+     units that scale with the diagram, not CSS pixels on the page. */
+
+  /* Breaks out of the reading measure to the container width, centred on the
+     text column (the ScrollTable `wide` pattern). */
+  .dg {
+    --gutter: var(--space-5);
+    --breakout: max(100%, min(var(--container) - 2 * var(--gutter), 100vw - 2 * var(--gutter)));
+    width: var(--breakout);
+    margin-inline: calc((100% - var(--breakout)) / 2);
+    container: dg / inline-size;
+    margin-block: var(--space-7);
+    padding: var(--space-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    /* A faint dot grid across the whole card, as texture: one dot per
+       space-5 step, a little under half the strong border colour. It is
+       background only, so it never sits in front of text, and assistive
+       technology never meets it. */
+    --dg-dot: color-mix(in srgb, var(--color-border-strong) 45%, transparent);
+    background-color: var(--color-surface);
+    background-image: radial-gradient(circle, var(--dg-dot) 1px, transparent 1.5px);
+    background-size: var(--space-5) var(--space-5);
+    background-position: center;
+    color: var(--color-text);
+    /* Text inks held to WCAG 1.4.6 (AAA, 7:1) in both themes: each semantic
+       colour pulled toward the text colour, so they stay theme-aware tokens.
+       Lowest measured: muted 7.7:1, primary 8.2:1, accent 7.9:1. */
+    --dg-ink-muted: color-mix(in srgb, var(--color-text-muted) 65%, var(--color-text));
+    --dg-ink-primary: color-mix(in srgb, var(--color-primary) 85%, var(--color-text));
+    --dg-ink-accent: color-mix(in srgb, var(--color-accent-ink) 70%, var(--color-text));
+  }
+  @media (min-width: 48rem) {
+    .dg {
+      --gutter: var(--space-6);
+      padding: var(--space-6);
+    }
+  }
+
+  .dg-caption {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .dg-kicker,
+  .dg-hint,
+  .dg-card-kicker,
+  .dg-card-paths-label,
+  .dg-control,
+  .dg-level {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .dg-kicker {
+    color: var(--dg-ink-primary);
+  }
+  .dg-title {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    line-height: 1.15;
+  }
+  .dg-subtitle {
+    color: var(--dg-ink-muted);
+  }
+  .dg-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-block: var(--space-4);
+  }
+  /* `.dg` prefixes keep these above Prose's `.prose p` margins. */
+  .dg .dg-hint {
+    margin: 0;
+    color: var(--dg-ink-muted);
+  }
+  /* Says so when the diagram is wider than its region and scrolls (the SVG's
+     floor width, below). */
+  .dg-hint-scroll {
+    display: none;
+  }
+  @container dg (width < 64rem) {
+    .dg-hint-scroll {
+      display: inline;
+    }
+  }
+  /* A wide diagram (many columns) keeps a higher floor, so its text stays
+     legible; the hint follows it. */
+  @container dg (width < 84rem) {
+    .dg--wide .dg-hint-scroll {
+      display: inline;
+    }
+  }
+
+  .dg-control {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    /* 44 × 44 CSS px at the least (WCAG 2.5.5, AAA). */
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    padding-inline: var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .dg-control:hover {
+    border-color: var(--color-primary);
+  }
+  .dg-control:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .dg-control--glyph {
+    padding-inline: 0;
+    font-family: var(--font-text);
+    font-size: var(--text-lg);
+    letter-spacing: 0;
+  }
+  .dg-control[hidden] {
+    display: none;
+  }
+  .dg-control[aria-disabled='true'] {
+    cursor: default;
+    color: var(--dg-ink-muted);
+    border-color: var(--color-border);
+  }
+  .dg-icon {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+  }
+
+  /* In the page, the diagram fills the figure and, below its floor, scrolls in
+     its own region rather than shrinking text past legibility. */
+  .dg-home {
+    overflow-x: auto;
+  }
+  .dg-home .dg-svg {
+    display: block;
+    width: 100%;
+    /* Floor: below it the region scrolls rather than shrink the text further
+       (labels then render at about 10 CSS px). */
+    min-width: 64rem;
+    height: auto;
+  }
+  .dg--wide .dg-home .dg-svg {
+    min-width: 84rem;
+  }
+
+  /* —— The SVG —— */
+  .dg-svg {
+    overflow: visible;
+    font-family: var(--font-text);
+  }
+  .dg-lane,
+  .dg-group,
+  .dg-note,
+  .dg-badge text {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .dg-lane {
+    fill: var(--dg-ink-primary);
+  }
+  .dg-group {
+    fill: var(--dg-ink-muted);
+  }
+  .dg-note--primary {
+    fill: var(--dg-ink-primary);
+  }
+  .dg-note--accent {
+    fill: var(--dg-ink-accent);
+  }
+  .dg-badge {
+    pointer-events: none;
+  }
+  .dg-badge rect {
+    fill: var(--color-surface);
+    stroke: var(--color-primary);
+  }
+  .dg-badge text {
+    /* BADGE.size in the frontmatter, which sizes the badge to its text. */
+    font-size: 14px;
+    fill: var(--dg-ink-muted);
+  }
+  .dg-rule {
+    stroke: var(--color-border);
+  }
+  /* Containers: a boundary is tinted, a network solid, a zone dashed, a
+     group dotted; all in border colours, behind the nodes. */
+  .dg-box rect {
+    fill: none;
+    stroke: var(--color-border-strong);
+    stroke-width: 1.5px;
+  }
+  .dg-box--boundary rect {
+    fill: color-mix(in srgb, var(--color-accent) 5%, transparent);
+    stroke: color-mix(in srgb, var(--color-accent) 55%, var(--color-border-strong));
+  }
+  .dg-box--zone rect {
+    stroke-dasharray: 8 6;
+  }
+  .dg-box--group rect {
+    stroke-dasharray: 2 5;
+    stroke-linecap: round;
+  }
+  .dg-box-label {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    fill: var(--dg-ink-muted);
+  }
+  .dg-box--boundary .dg-box-label {
+    fill: var(--dg-ink-accent);
+  }
+  .dg-return-label {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    fill: var(--dg-ink-primary);
+  }
+  .dg-arrow {
+    fill: var(--color-primary);
+  }
+
+  /* Path highlight, while a node's detail card is open: the open card sets
+     --dg-active on the stage, and every element on a path through its node
+     (classes f1 … f16, one per flow; MAX_FLOWS in src/lib/diagram.ts) sets
+     --dg-lit. On-path connectors thicken and their nodes take a ring;
+     off-path connectors fade, but only to 65%, which keeps them at 3:1
+     against the panel in both themes (WCAG 1.4.11). Node text never fades.
+     Hover and focus light the node alone (below). */
+  .dg-stage:has(.dg-card:popover-open) {
+    --dg-active: 1;
+  }
+  .dg-stage:has(.f1.dg-card:popover-open) .f1,
+  .dg-stage:has(.f2.dg-card:popover-open) .f2,
+  .dg-stage:has(.f3.dg-card:popover-open) .f3,
+  .dg-stage:has(.f4.dg-card:popover-open) .f4,
+  .dg-stage:has(.f5.dg-card:popover-open) .f5,
+  .dg-stage:has(.f6.dg-card:popover-open) .f6,
+  .dg-stage:has(.f7.dg-card:popover-open) .f7,
+  .dg-stage:has(.f8.dg-card:popover-open) .f8,
+  .dg-stage:has(.f9.dg-card:popover-open) .f9,
+  .dg-stage:has(.f10.dg-card:popover-open) .f10,
+  .dg-stage:has(.f11.dg-card:popover-open) .f11,
+  .dg-stage:has(.f12.dg-card:popover-open) .f12,
+  .dg-stage:has(.f13.dg-card:popover-open) .f13,
+  .dg-stage:has(.f14.dg-card:popover-open) .f14,
+  .dg-stage:has(.f15.dg-card:popover-open) .f15,
+  .dg-stage:has(.f16.dg-card:popover-open) .f16 {
+    --dg-lit: 1;
+  }
+  .dg-edge--return {
+    stroke-dasharray: 7 6;
+  }
+  .dg-edge {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-width: calc(1.75px + var(--dg-lit, 0) * 1.5px);
+    opacity: calc(1 - 0.35 * var(--dg-active, 0) * (1 - var(--dg-lit, 0)));
+  }
+
+  /* —— Nodes: HTML buttons in foreignObject, so labels wrap and stay real text —— */
+  /* Never clip: under a reader's text-spacing overrides (WCAG 1.4.12) a label
+     may grow past its box into the gap below rather than be cut off. */
+  .dg-fo {
+    overflow: visible;
+  }
+  .dg-btn {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+    margin: 6px;
+    padding: 0 18px;
+    border: 1.5px solid
+      color-mix(
+        in srgb,
+        var(--color-primary) calc(var(--dg-lit, 0) * 100%),
+        var(--color-border-strong)
+      );
+    border-radius: 10px;
+    background: var(--color-surface-2);
+    box-shadow: 0 0 0 calc(var(--dg-lit, 0) * 1.5px) var(--color-primary);
+    color: var(--color-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .dg-btn--key {
+    border-color: var(--color-primary);
+  }
+  .dg-btn--actor {
+    border-style: dashed;
+    background: var(--color-surface);
+  }
+  /* Hover and keyboard focus light the node itself (focus also draws the
+     ring below); the path waits for the card. */
+  .dg-btn:is(:hover, :focus-visible) {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1.5px var(--color-primary);
+  }
+  /* The visible ring is the SVG .dg-ring; a transparent outline remains so
+     forced-colours mode still draws one on the button itself. */
+  .dg-btn:focus-visible {
+    outline: 2px solid transparent;
+  }
+  .dg-ring {
+    fill: none;
+    stroke: var(--color-focus);
+    stroke-width: 3px;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .dg-node:has(.dg-btn:focus-visible) .dg-ring {
+    visibility: visible;
+  }
+  .dg-node:has(.dg-btn:focus-visible) .dg-badge rect {
+    stroke: var(--color-focus);
+    stroke-width: 3px;
+    vector-effect: non-scaling-stroke;
+  }
+  .dg-btn-title {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+  .dg-btn-detail {
+    font-size: 17px;
+    line-height: 1.25;
+    color: var(--dg-ink-muted);
+  }
+
+  .dg-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 28px;
+    padding-top: 10px;
+    color: var(--color-text);
+    font-size: 18px;
+  }
+  .dg-foot-label {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dg-ink-muted);
+  }
+  .dg-foot-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* —— Detail cards (native popovers) ——
+     A card is a sheet docked to the bottom of the viewport, the same in every
+     engine. It must not cover the path it lights, so the script moves the
+     diagram instead: in the page it scrolls the lit path clear of the sheet
+     (never pushing it under the header), and in the expanded view it pads the
+     viewport by the sheet's height, so the diagram re-centres above it.
+     Without the script the page simply scrolls under the sheet. */
+  .dg-card {
+    box-sizing: border-box;
+    inset: auto var(--space-3) var(--space-3);
+    margin: 0 auto;
+    width: min(44rem, 100vw - 2 * var(--space-3));
+    max-height: min(45dvh, 24rem);
+    overflow: auto;
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    line-height: 1.55;
+  }
+  .dg .dg-card p {
+    margin: 0;
+  }
+  .dg-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+  .dg-card-kicker {
+    color: var(--dg-ink-primary);
+  }
+  .dg .dg-card .dg-card-title {
+    margin-top: var(--space-1);
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    line-height: 1.2;
+  }
+  .dg-card-detail {
+    color: var(--dg-ink-muted);
+  }
+  .dg .dg-card .dg-card-body {
+    margin-top: var(--space-3);
+  }
+  .dg .dg-card .dg-card-paths {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+  }
+  .dg-card-paths-label {
+    color: var(--dg-ink-muted);
+  }
+  .dg-card-close {
+    flex: none;
+  }
+
+  /* —— Text alternative —— */
+  .dg-text {
+    margin-top: var(--space-4);
+    font-size: var(--text-base);
+  }
+  /* Keeps its disclosure marker (display stays list-item) and grows to a
+     44 px target (WCAG 2.5.5, AAA). */
+  .dg-text summary {
+    box-sizing: border-box;
+    width: fit-content;
+    min-height: 2.75rem;
+    padding-block: var(--space-2);
+    cursor: pointer;
+    color: var(--dg-ink-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .dg-text summary:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .dg-text-flows,
+  .dg-text-notes {
+    margin-block: var(--space-3) 0;
+  }
+  .dg-text-flow {
+    font-weight: 600;
+  }
+  .dg .dg-text-foot {
+    margin-block: var(--space-3) 0;
+  }
+
+  /* —— Expanded view —— */
+  .dg-dialog {
+    box-sizing: border-box;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+  .dg-dialog[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  .dg-dialog::backdrop {
+    background: transparent;
+  }
+  :global(html:has(dialog.dg-dialog[open])) {
+    overflow: hidden;
+  }
+  .dg-dialog-bar {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .dg .dg-dialog-title {
+    flex: 1 1 12rem;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+  }
+  /* On a small or zoomed screen the controls get the bar to themselves; the
+     title still names the dialog for assistive technology. */
+  @media (max-width: 30rem), (max-height: 30rem) {
+    .dg .dg-dialog-title {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .dg-dialog-bar {
+      justify-content: space-between;
+      padding: var(--space-2);
+    }
+  }
+  .dg-zoom {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .dg-level {
+    min-width: 4ch;
+    text-align: center;
+  }
+  /* Auto margins centre the diagram while it fits and fall back to the start
+     edge once it overflows, so no part is ever out of scroll reach. */
+  .dg-viewport {
+    /* The same dot grid as the card, behind the expanded diagram. */
+    background-image: radial-gradient(circle, var(--dg-dot) 1px, transparent 1.5px);
+    background-size: var(--space-5) var(--space-5);
+    background-attachment: local;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: var(--space-5);
+  }
+  .dg-viewport:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -4px;
+  }
+  /* Opened by pointer or touch: the viewport takes focus without a ring
+     (WebKit otherwise draws one on tap); the first key press brings it back. */
+  .dg-dialog[data-pointer] .dg-viewport:focus-visible {
+    outline: none;
+  }
+  .dg-viewport[data-pannable] {
+    cursor: grab;
+  }
+  .dg-viewport[data-panning] {
+    cursor: grabbing;
+    user-select: none;
+  }
+  .dg-viewport .dg-stage {
+    margin: auto;
+    flex: none;
+  }
+  .dg-viewport .dg-svg {
+    display: block;
+  }
+
+  /* Forced colours (e.g. Windows contrast themes): the HTML parts are
+     remapped by the browser, the SVG paint is not, so map it to system
+     colours here. */
+  @media (forced-colors: active) {
+    .dg-lane,
+    .dg-group,
+    .dg-note,
+    .dg-badge text {
+      fill: CanvasText;
+    }
+    .dg-badge rect {
+      fill: Canvas;
+      stroke: CanvasText;
+    }
+    .dg-edge,
+    .dg-rule,
+    .dg-box rect {
+      stroke: CanvasText;
+    }
+    .dg-box rect {
+      fill: none;
+    }
+    .dg-box-label,
+    .dg-return-label {
+      fill: CanvasText;
+    }
+    .dg-arrow {
+      fill: CanvasText;
+    }
+    .dg-stage .dg-edge {
+      opacity: 1;
+    }
+    .dg-ring,
+    .dg-node:has(.dg-btn:focus-visible) .dg-badge rect {
+      stroke: Highlight;
+    }
+    /* Borders and shadows are forced, so a node on a lit path takes an
+       outline instead (0 wide when unlit). */
+    .dg-btn {
+      outline: calc(var(--dg-lit, 0) * 3px) solid Highlight;
+      outline-offset: 2px;
+    }
+    .dg,
+    .dg-viewport {
+      background-image: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .dg-edge {
+      transition:
+        opacity var(--dur-2) var(--ease-out),
+        stroke-width var(--dur-2) var(--ease-out);
+    }
+    .dg-btn {
+      transition:
+        border-color var(--dur-1) var(--ease-out),
+        box-shadow var(--dur-1) var(--ease-out);
+    }
+  }
+</style>
+
+<script>
+  /*
+   * Zoom in the expanded view is a scale: CSS px per viewBox unit, shown as a
+   * percentage of the diagram's design size. The floor fits the whole diagram;
+   * it opens at the larger of that and its in-page scale, so expanding never
+   * shrinks it; the ceiling is 4× the fit or twice the design size.
+   */
+  const STEP = 1.5;
+  const MAX_OF_FIT = 4;
+  const MAX_OF_DESIGN = 2;
+  /** Wheel delta honoured per event (px), so one notch is one modest step. */
+  const WHEEL_CAP = 40;
+  const WHEEL_RATE = 0.006;
+
+  const headerOffset = () =>
+    parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 0;
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-dg]')) {
+    const q = <T extends Element>(sel: string) => figure.querySelector<T>(sel);
+    const expand = q<HTMLButtonElement>('[data-dg-expand]');
+    const dialog = q<HTMLDialogElement>('[data-dg-dialog]');
+    const viewport = q<HTMLElement>('[data-dg-viewport]');
+    const home = q<HTMLElement>('[data-dg-home]');
+    const stage = q<HTMLElement>('[data-dg-stage]');
+    const svg = q<SVGSVGElement>('[data-dg-svg]');
+    const level = q<HTMLOutputElement>('[data-dg-level]');
+    const zoomIn = q<HTMLButtonElement>('[data-dg-zoom="in"]');
+    const zoomOut = q<HTMLButtonElement>('[data-dg-zoom="out"]');
+    const fit = q<HTMLButtonElement>('[data-dg-zoom="fit"]');
+    const close = q<HTMLButtonElement>('[data-dg-close]');
+    if (!home || !stage) continue;
+
+    const inDialog = () => !!dialog?.open;
+    const region = () => (inDialog() && viewport ? viewport : home);
+    const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /** Vertical extent of the nodes and connectors a card lights. */
+    const litBounds = (card: HTMLElement) => {
+      const slots = [...card.classList].filter((c) => /^f\d+$/.test(c));
+      let top = Infinity;
+      let bottom = -Infinity;
+      for (const el of stage.querySelectorAll('.dg-node, .dg-edge')) {
+        if (!slots.some((slot) => el.classList.contains(slot))) continue;
+        const r = el.getBoundingClientRect();
+        top = Math.min(top, r.top);
+        bottom = Math.max(bottom, r.bottom);
+      }
+      return { top, bottom };
+    };
+
+    /** Scroll amount that brings [top, bottom] inside [min, max], favouring the top. */
+    const fitInto = (top: number, bottom: number, min: number, max: number) => {
+      if (bottom > max) return Math.min(bottom - max, Math.max(top - min, 0));
+      if (top < min) return top - min;
+      return 0;
+    };
+
+    /** Moves the diagram so the lit path, and the node, clear the open card. */
+    const reveal = (card: HTMLElement, invoker: HTMLElement | null) => {
+      const sheetTop = card.getBoundingClientRect().top - 8;
+      if (inDialog() && viewport) {
+        // Pad the viewport by the sheet, so the diagram re-centres above it.
+        viewport.style.paddingBottom = `${Math.max(innerHeight - sheetTop, 0)}px`;
+        const area = viewport.getBoundingClientRect();
+        const lit = litBounds(card);
+        viewport.scrollTop += fitInto(lit.top, lit.bottom, area.top + 8, sheetTop);
+      } else {
+        const lit = litBounds(card);
+        const by = fitInto(lit.top, lit.bottom, headerOffset() + 8, sheetTop);
+        if (by) window.scrollBy({ top: by, behavior: still() ? 'auto' : 'smooth' });
+      }
+      // Below the floor width the region scrolls sideways: keep the node in it.
+      if (invoker) {
+        const scroller = region();
+        const r = invoker.getBoundingClientRect();
+        const s = scroller.getBoundingClientRect();
+        if (r.left < s.left || r.right > s.right) {
+          scroller.scrollLeft += r.left - s.left - (s.width - r.width) / 2;
+        }
+      }
+    };
+
+    // Cards: return focus to the node when closed from the card's Close button
+    // or with Escape (Safari never focused the clicked node, so the browser's
+    // own restore would land on <body>); a click elsewhere keeps its focus.
+    // Escape is recorded as it happens, so the close can tell it apart from a
+    // pointer dismissal however quickly one follows the other.
+    let escapeAt = -Infinity;
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.key === 'Escape') escapeAt = performance.now();
+      },
+      true,
+    );
+    for (const card of figure.querySelectorAll<HTMLElement>('.dg-card[popover]')) {
+      const invoker = figure.querySelector<HTMLButtonElement>(
+        `.dg-btn[popovertarget="${card.id}"]`,
+      );
+      card.querySelector('.dg-card-close')?.addEventListener('click', () => {
+        requestAnimationFrame(() => invoker?.focus({ preventScroll: true }));
+      });
+      card.addEventListener('toggle', (event) => {
+        if ((event as ToggleEvent).newState === 'open') {
+          requestAnimationFrame(() => reveal(card, invoker));
+          return;
+        }
+        if (inDialog() && viewport) viewport.style.paddingBottom = '';
+        const lost = !document.activeElement || document.activeElement === document.body;
+        const byEscape = performance.now() - escapeAt < 1000;
+        if (lost && byEscape) invoker?.focus({ preventScroll: true });
+      });
+    }
+
+    if (
+      !expand ||
+      !dialog ||
+      !viewport ||
+      !svg ||
+      !level ||
+      !zoomIn ||
+      !zoomOut ||
+      !fit ||
+      !close ||
+      !('showModal' in dialog)
+    ) {
+      continue;
+    }
+
+    const box = svg.viewBox.baseVal;
+    const initial = { width: svg.getAttribute('width'), height: svg.getAttribute('height') };
+    let scale = 1;
+
+    /** Scale at which the whole diagram fits the viewport. */
+    const fitScale = () => {
+      const style = getComputedStyle(viewport);
+      const padX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+      const padY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      return Math.max(
+        Math.min(
+          (viewport.clientWidth - padX) / box.width,
+          (viewport.clientHeight - padY) / box.height,
+        ),
+        0.05,
+      );
+    };
+    const bounds = () => {
+      const min = fitScale();
+      return { min, max: Math.max(min * MAX_OF_FIT, MAX_OF_DESIGN) };
+    };
+
+    /** Sets the scale, keeping the content under `at` (viewport coords) in place. */
+    const setScale = (next: number, at?: { x: number; y: number }) => {
+      const px = at?.x ?? viewport.clientWidth / 2;
+      const py = at?.y ?? viewport.clientHeight / 2;
+      const fx = (viewport.scrollLeft + px) / viewport.scrollWidth;
+      const fy = (viewport.scrollTop + py) / viewport.scrollHeight;
+      const { min, max } = bounds();
+      scale = Math.min(max, Math.max(min, next));
+      svg.setAttribute('width', String(Math.round(box.width * scale)));
+      svg.setAttribute('height', String(Math.round(box.height * scale)));
+      viewport.scrollLeft = fx * viewport.scrollWidth - px;
+      viewport.scrollTop = fy * viewport.scrollHeight - py;
+      level.value = `${Math.round(scale * 100)}%`;
+      zoomOut.setAttribute('aria-disabled', String(scale <= min * 1.001));
+      zoomIn.setAttribute('aria-disabled', String(scale >= max * 0.999));
+      viewport.toggleAttribute(
+        'data-pannable',
+        viewport.scrollWidth > viewport.clientWidth ||
+          viewport.scrollHeight > viewport.clientHeight,
+      );
+    };
+
+    expand.hidden = false;
+    expand.addEventListener('click', (event) => {
+      const inPage = svg.getBoundingClientRect().width / box.width;
+      // Opened by pointer or touch (detail > 0): no focus ring until a key press.
+      dialog.toggleAttribute('data-pointer', event.detail > 0);
+      // Hold the page layout while the diagram is away, so nothing shifts
+      // and the scroll position survives (Firefox otherwise moves it).
+      home.style.minHeight = `${home.getBoundingClientRect().height}px`;
+      viewport.append(stage);
+      dialog.showModal();
+      setScale(Math.max(fitScale(), inPage));
+    });
+    dialog.addEventListener('close', () => {
+      home.append(stage);
+      home.style.minHeight = '';
+      viewport.style.paddingBottom = '';
+      if (initial.width) svg.setAttribute('width', initial.width);
+      if (initial.height) svg.setAttribute('height', initial.height);
+      viewport.removeAttribute('data-pannable');
+      // Explicit, because Safari never focused the clicked Expand button.
+      expand.focus({ preventScroll: true });
+    });
+    close.addEventListener('click', () => dialog.close());
+    zoomIn.addEventListener('click', () => setScale(scale * STEP));
+    zoomOut.addEventListener('click', () => setScale(scale / STEP));
+    fit.addEventListener('click', () => setScale(fitScale()));
+    window.addEventListener('resize', () => {
+      if (dialog.open) setScale(scale);
+    });
+
+    dialog.addEventListener('keydown', (event) => {
+      if (dialog.hasAttribute('data-pointer')) {
+        dialog.removeAttribute('data-pointer');
+        // Firefox keeps a pointer-focused element non-:focus-visible after a
+        // key press; focusing it again from the keyboard turns the ring on.
+        if (document.activeElement === viewport) {
+          viewport.blur();
+          viewport.focus({ preventScroll: true });
+        }
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key === '+' || event.key === '=') setScale(scale * STEP);
+      else if (event.key === '-' || event.key === '_') setScale(scale / STEP);
+      else if (event.key === '0') setScale(fitScale());
+      else return;
+      event.preventDefault();
+    });
+
+    // Ctrl/⌘-wheel, and a trackpad pinch (which browsers report as a
+    // ctrl-wheel), zoom about the pointer; a plain wheel keeps scrolling. The
+    // delta is normalised to pixels and capped, so a mouse notch is a modest
+    // step and a pinch stays smooth.
+    viewport.addEventListener(
+      'wheel',
+      (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
+        const delta = Math.max(-WHEEL_CAP, Math.min(WHEEL_CAP, event.deltaY * unit));
+        const rect = viewport.getBoundingClientRect();
+        setScale(scale * Math.exp(-delta * WHEEL_RATE), {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        });
+      },
+      { passive: false },
+    );
+
+    // Drag to pan with a mouse; touch keeps the browser's own scrolling.
+    let drag: { x: number; y: number; left: number; top: number; id: number } | undefined;
+    viewport.addEventListener('pointerdown', (event) => {
+      if (event.pointerType !== 'mouse' || event.button !== 0) return;
+      if ((event.target as Element).closest('button, [popover]')) return;
+      if (!viewport.hasAttribute('data-pannable')) return;
+      drag = {
+        x: event.clientX,
+        y: event.clientY,
+        left: viewport.scrollLeft,
+        top: viewport.scrollTop,
+        id: event.pointerId,
+      };
+      viewport.setPointerCapture(event.pointerId);
+      viewport.setAttribute('data-panning', '');
+    });
+    viewport.addEventListener('pointermove', (event) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      viewport.scrollLeft = drag.left - (event.clientX - drag.x);
+      viewport.scrollTop = drag.top - (event.clientY - drag.y);
+    });
+    const endDrag = () => {
+      drag = undefined;
+      viewport.removeAttribute('data-panning');
+    };
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+  }
+</script>

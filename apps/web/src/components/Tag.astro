@@ -1,0 +1,33 @@
+---
+import type { Discipline } from '@quarry/ui/tokens';
+
+interface Props {
+  discipline: Discipline;
+  /** When set, the chip renders as a link (visually identical). */
+  href?: string;
+}
+const { discipline, href } = Astro.props;
+const label = discipline.toUpperCase();
+
+const base =
+  'inline-block font-mono text-2xs tracking-[0.08em] px-[0.6rem] py-[0.3rem] rounded-full';
+/* Discipline tint/ink pairs from tokens.css — the ink values are darkened
+   to meet WCAG AA (≥4.5:1) on each pale tint; one entry per Discipline value. */
+const tones: Record<Discipline, string> = {
+  strategy: 'bg-(--discipline-strategy-tint) text-(--discipline-strategy-ink)',
+  design: 'bg-(--discipline-design-tint) text-(--discipline-design-ink)',
+  engineering: 'bg-(--discipline-engineering-tint) text-(--discipline-engineering-ink)',
+  ecommerce: 'bg-(--discipline-ecommerce-tint) text-(--discipline-ecommerce-ink)',
+  data: 'bg-(--discipline-data-tint) text-(--discipline-data-ink)',
+};
+const chip = `${base} ${tones[discipline]}`;
+const link = `${chip} no-underline hover:underline focus-visible:underline underline-offset-2`;
+---
+
+{href ? (
+  <a class={link} href={href}>
+    {label}
+  </a>
+) : (
+  <span class={chip}>{label}</span>
+)}

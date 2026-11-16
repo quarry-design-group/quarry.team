@@ -1,0 +1,72 @@
+---
+/**
+ * Confirmation screen for the grievance form (on demand: the reference number
+ * arrives in the query string after the 303 from the POST, so the no-JS path
+ * gets a real page with a real number). A missing or malformed reference
+ * still renders a confirmation — a visitor who arrives here has submitted.
+ */
+export const prerender = false;
+
+import Base from '@/layouts/Base.astro';
+import Button from '@/components/Button.astro';
+import Email from '@/components/Email.astro';
+import { REF_PATTERN } from '@/lib/grievances';
+
+const raw = Astro.url.searchParams.get('ref') ?? '';
+const ref = REF_PATTERN.test(raw) ? raw : '';
+---
+
+<Base
+  title="Concern received"
+  description="Your concern has reached Quarry. Keep your reference number; we acknowledge within five business days and aim to resolve or update within 30 days."
+  noindex
+>
+  <section class="section">
+    <div class="container max-w-(--measure)">
+      <p class="eyebrow">Grievances &amp; Concerns</p>
+      <h1 class="mt-3 text-4xl">Thank you. We’ve received your concern.</h1>
+      {ref && (
+        <div class="mt-8 rounded-lg border border-(--color-border) bg-(--color-surface) p-6">
+          <p class="m-0 font-mono text-xs tracking-[0.08em] text-(--color-text-muted) uppercase">
+            Your reference number
+          </p>
+          <p class="mt-2 mb-0 font-mono text-3xl tracking-[0.04em]">{ref}</p>
+          <p class="mt-3 mb-0 text-sm text-(--color-text-muted)">
+            Keep it. It is how we and you refer to this matter, and the only way to follow up on an
+            anonymous submission.
+          </p>
+        </div>
+      )}
+
+      <h2 class="mt-12 text-2xl">What happens next</h2>
+      <ol class="mt-4 grid gap-3 text-lg">
+        <li>
+          If you gave us an email address, an acknowledgment is on its way and we confirm receipt
+          within five business days.
+        </li>
+        <li>
+          The grievance owner reviews your concern. You may be asked follow-up questions if we can
+          reach you.
+        </li>
+        <li>
+          We aim to resolve the concern, or give you a substantive update, within 30 days. Longer
+          matters receive a written status update every 30 days until they are closed.
+        </li>
+      </ol>
+      <p class="mt-6 text-(--color-text-muted)">
+        To add information or check on an anonymous submission, email{' '}
+        <Email address="concerns@quarry.team" /> and quote your reference number. No one will face
+        retaliation for raising a concern in good faith.
+      </p>
+
+      <div class="mt-10 flex flex-wrap gap-3">
+        <Button href="/policies/grievances" variant="secondary" data-astro-prefetch="false">
+          How this process works
+        </Button>
+        <Button href="/" variant="ghost">
+          Back home
+        </Button>
+      </div>
+    </div>
+  </section>
+</Base>

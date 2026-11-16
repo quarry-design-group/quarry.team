@@ -1,0 +1,206 @@
+---
+/**
+ * ToolsSection — a full-bleed "strata" band: eyebrow/heading/intro and the
+ * labeled TechStack grid sit inside the standard .container, over a decorative
+ * backdrop of slow marquee rows of the same tool tiles — brand-color tinted
+ * ("color weather") and dissolved at the band's top/bottom edges via a
+ * vertical mask. Rows cycle through three depth tiers (near/mid/far: less
+ * blur + smaller scale + brighter and quicker up close, the inverse far away)
+ * so the field reads as a dimensional strata, not a flat smudge. A bg-colored
+ * radial scrim sits between backdrop and content so the foreground always
+ * reads. Adjacent bands fuse (no doubled border, quieter backdrop) so pairs
+ * read as rhythm, not repetition. Purely atmospheric (aria-hidden,
+ * pointer-events: none, reduced-motion safe). The band is its own
+ * [data-marquee-scope], so the <MarqueePause> on its heading row pauses the
+ * drift (WCAG 2.2.2).
+ *
+ * The blurred marquee field is the page's heaviest paint work, so the band
+ * uses content-visibility:auto to skip rendering it off-screen; the
+ * contain-intrinsic-size placeholder keeps scroll geometry stable (no CLS).
+ */
+import TechStack from '@/components/TechStack.astro';
+import MarqueePause from '@/components/MarqueePause.astro';
+import type { Logo } from '@/lib/site';
+import { styleScope } from '@/lib/style-scope';
+
+interface Props {
+  eyebrow?: string;
+  heading: string;
+  intro: string;
+  items: Logo[];
+  class?: string;
+}
+const { eyebrow, heading, intro, items, class: cls } = Astro.props;
+
+// One backdrop row per foreground grid row, implicitly — the TechStack grid
+// resolves to 6 columns at desktop container width, so the backdrop always
+// matches the visual weight of the grid it sits behind.
+const FG_COLS = 6;
+const rows = Math.ceil(items.length / FG_COLS);
+
+// Alternate row direction so adjacent rows drift opposite ways. Each row is
+// tripled so the marquee can loop seamlessly (translateX of one-third).
+const bgRows = Array.from({ length: rows }, (_, i) => (i % 2 ? [...items].reverse() : items));
+
+// Depth tiers — near layers are crisper, smaller, brighter, and drift faster
+// (parallax); far layers are softer, larger, dimmer, slower. Cycled so
+// adjacent rows always sit on different planes. Small per-row duration jitter
+// desynchronizes the loops.
+const tiers = {
+  far: { blur: 36, scale: 2.6, alpha: 0.8, dur: 180 },
+  near: { blur: 14, scale: 1.9, alpha: 1.25, dur: 110 },
+  mid: { blur: 24, scale: 2.2, alpha: 1, dur: 140 },
+} as const;
+const tierOf = (i: number) => tiers[(['far', 'near', 'mid'] as const)[i % 3]];
+
+// Per-row tier vars and per-tile brand/icon ride a generated style block (the
+// strict CSP forbids style attributes — ADR-0015). Rows are addressed by
+// position; tiles by an N-step nth-child cycle, since each track is the item
+// list tripled: child Nn+i is always item i (in row order). L-rows run in item
+// order, R-rows reversed — two rule sets cover every row of that direction.
+// Both vars sit on the tile; the icon span's mask reads the inherited --icon.
+const sid = styleScope('tools', JSON.stringify(items.map((t) => [t.color, t.src])) + rows);
+const N = items.length;
+const rowCss = bgRows
+  .map((_row, i) => {
+    const t = tierOf(i);
+    return `.${sid} .tools-bg>:nth-child(${i + 1}){--blur:${t.blur}px;--scale:${t.scale};--alpha-mult:${t.alpha};--dur:${t.dur + i * 7}s}`;
+  })
+  .join('');
+const tileCss = (order: Logo[], dir: 'l' | 'r') =>
+  order
+    .map((t, i) => {
+      const tile = `.${sid} .tbg-row--${dir} .tbg-track>:nth-child(${N}n+${i + 1})`;
+      return `${tile}{--brand:${t.color ?? 'var(--color-text)'};--icon:url('${t.src}')}`;
+    })
+    .join('');
+const varCss = rowCss + tileCss(items, 'l') + tileCss([...items].reverse(), 'r');
+---
+
+<section
+  class:list={[
+    'tools-band relative isolate overflow-clip border-y border-(--color-border) bg-(--color-bg) py-(--space-section) [--tbg-alpha:0.26] [contain-intrinsic-size:auto_100vw_auto_760px] [content-visibility:auto]',
+    // Adjacent bands fuse: no doubled border, tighter seam, quieter backdrop.
+    '[.tools-band+&]:border-t-0 [.tools-band+&]:pt-12 [.tools-band+&]:[--tbg-alpha:0.19]',
+    sid,
+    cls,
+  ]}
+  data-marquee-scope
+>
+  <div
+    class="tools-bg pointer-events-none absolute inset-[-10%_-4%] z-0 flex flex-col justify-center gap-[4%]"
+    aria-hidden="true"
+  >
+    {bgRows.map((row, i) => (
+      <div class={`tbg-row tbg-row--${i % 2 ? 'r' : 'l'} overflow-hidden`}>
+        <div class="tbg-track flex w-max items-center gap-8">
+          {[...row, ...row, ...row].map((t) => (
+            <span class="flex items-center gap-[0.6rem] whitespace-nowrap rounded-md border border-(--color-border-strong) bg-(--color-surface) px-[1.1rem] py-[0.8rem]">
+              <span class="h-[26px] w-[26px] flex-none bg-[color-mix(in_oklab,var(--brand)_60%,var(--color-text))] [-webkit-mask:var(--icon)_center/contain_no-repeat] [mask:var(--icon)_center/contain_no-repeat]" />
+              {/* The label rides ::after (content: attr), not a text node:
+                     the rows composite at ~0.2 opacity, so real text here can
+                     never meet 4.5:1 and axe flags it — WCAG 1.4.3 exempts
+                     pure decoration, but axe can only honor that if there is
+                     no text node. */}
+              <span
+                class="text-[1rem] font-bold text-[color-mix(in_oklab,var(--brand)_60%,var(--color-text))] after:content-[attr(data-label)]"
+                data-label={t.name}
+              />
+            </span>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+  <style is:inline set:html={varCss}></style>
+  <!-- Scrim between backdrop and content — bg-colored (never alpha-black/white)
+       so the center stays quiet for the foreground in both themes. -->
+  <div
+    class="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_75%_70%_at_50%_42%,color-mix(in_oklab,var(--color-bg)_80%,transparent),transparent_100%)]"
+    aria-hidden="true"
+  ></div>
+
+  <div class="container relative z-[1]">
+    <div class="marquee-head">
+      <div>
+        {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+        <h2 class="mt-3 text-3xl">{heading}</h2>
+      </div>
+      {/* The heading makes each band's control distinct when a page carries two. */}
+      <MarqueePause label={`Pause tools animation: ${heading}`} />
+    </div>
+    <p class="mt-4 max-w-(--measure) text-lg text-(--color-text-muted)">{intro}</p>
+    <TechStack items={items} class="mt-12" />
+  </div>
+</section>
+
+<style>
+  /* Residual CSS (per conversion whitelist): theme-toggle-tracking dark
+     overrides, the backdrop's dissolve mask + paint containment, and the
+     var-driven marquee depth/drift choreography with its keyframes. */
+
+  /* Dark themes quiet the backdrop further (data-theme toggle + system-pref pair). */
+  :global(:root[data-theme='dark']) .tools-band {
+    --tbg-alpha: 0.22;
+  }
+  :global(:root[data-theme='dark']) .tools-band + .tools-band {
+    --tbg-alpha: 0.16;
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .tools-band {
+      --tbg-alpha: 0.22;
+    }
+    :global(:root:not([data-theme='light'])) .tools-band + .tools-band {
+      --tbg-alpha: 0.16;
+    }
+  }
+
+  /* Decorative backdrop — overscanned so the heavy blur never reveals an edge,
+     and dissolved vertically so the strata fade into the band's borders.
+     (Mask lives here; filter lives on the rows — never both on one element.) */
+  .tools-bg {
+    contain: layout style paint;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent);
+  }
+  /* Each row carries its depth tier via custom properties (--blur, --scale,
+     --alpha-mult, --dur) set inline from the frontmatter tier table. */
+  .tbg-row {
+    filter: blur(var(--blur)) saturate(0.75);
+    opacity: calc(var(--tbg-alpha) * var(--alpha-mult));
+  }
+  .tbg-track {
+    transform: scale(var(--scale));
+    transform-origin: center;
+    will-change: transform;
+  }
+  /* The play state follows the shorthand, which resets it; --lw-play comes
+     from the band's MarqueePause (global.css). */
+  .tbg-row--l .tbg-track {
+    animation: tbg-drift-l var(--dur) linear infinite;
+    animation-play-state: var(--lw-play, running);
+  }
+  .tbg-row--r .tbg-track {
+    animation: tbg-drift-r var(--dur) linear infinite;
+    animation-play-state: var(--lw-play, running);
+  }
+
+  @keyframes tbg-drift-l {
+    to {
+      transform: scale(var(--scale)) translateX(-33.333%);
+    }
+  }
+  @keyframes tbg-drift-r {
+    from {
+      transform: scale(var(--scale)) translateX(-33.333%);
+    }
+    to {
+      transform: scale(var(--scale)) translateX(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tbg-track {
+      animation: none;
+    }
+  }
+</style>

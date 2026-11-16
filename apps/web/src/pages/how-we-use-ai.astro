@@ -1,0 +1,170 @@
+---
+import Base from '@/layouts/Base.astro';
+import Button from '@/components/Button.astro';
+import CtaBand from '@/components/CtaBand.astro';
+import { primaryCta } from '@/lib/site';
+
+// How we use AI — a backbone page. The register is Quarry's: confident,
+// measured, anti-hype. The differentiator isn't that we use AI (everyone
+// claims to). It's the discipline around it. Senior judgment owns the work;
+// AI is leverage on the toil. No fabricated metrics: the proof is the standard.
+const principles = [
+  {
+    n: '01',
+    title: 'Senior hands on the wheel',
+    body: 'AI drafts; a senior engineer or designer owns every decision and every line that ships. The model is a force multiplier on judgment we already have, never a stand-in for it.',
+  },
+  {
+    n: '02',
+    title: 'Leverage, applied where it earns its place',
+    body: 'We reach for AI on the toil — research synthesis, scaffolding, test generation, refactors, migration grunt-work — and ignore it where a human is simply better. Taste and architecture stay ours.',
+  },
+  {
+    n: '03',
+    title: 'Nothing ships unread',
+    body: 'Every AI-assisted artifact clears the same gate as everything else: typed, linted, tested, accessible, fast. The bar does not move because a model wrote the first draft.',
+  },
+];
+
+// Where AI shows up across the delivery lifecycle. Concrete, not aspirational.
+const surfaces: [string, string][] = [
+  [
+    'Discovery & research',
+    'Synthesize interviews and source material, surface patterns, and pressure-test assumptions, so the strategy work starts from signal, not a blank page.',
+  ],
+  [
+    'Design',
+    'Explore more directions in less time and interrogate our own choices. The model widens the option space; the taste that picks the winner is human.',
+  ],
+  [
+    'Engineering',
+    'Scaffolding, tests, refactors, and migrations: the toil, automated. The architecture, the trade-offs, and the review stay deliberate and senior.',
+  ],
+  [
+    'Data',
+    'Pipelines, transforms, and exploratory analysis accelerated, behind the same privacy-first guardrails every engagement gets. Your data stays yours.',
+  ],
+  [
+    'Docs & operations',
+    'Runbooks and decision records ship in the same change as the code they describe, and CI fails when generated docs drift. This very repository holds itself to that standard.',
+  ],
+];
+
+// The anti-slop guardrails: the clearest expression of the brand promise.
+const guardrails: string[] = [
+  'We don’t ship unreviewed generated code.',
+  'We don’t feed your proprietary data into tools that train on it.',
+  'We don’t pad deliverables with AI filler to look busy.',
+  'We don’t mistake a model’s confidence for correctness.',
+];
+---
+
+<Base
+  title="How we use AI: senior judgment, real leverage"
+  description="AI is leverage, not a license to ship slop. How Quarry applies AI deliberately: senior judgment on the wheel, every artifact held to the same gate."
+>
+  <!-- HERO (the sections on this page trim the .section seams for even spacing) -->
+  <section class="section pb-16">
+    <div class="container">
+      <p class="eyebrow">How we use AI</p>
+      <h1 class="mt-4 max-w-[min(20ch,100%)] text-5xl">
+        <span class="block">AI is leverage.</span>
+        <span class="block">Judgment is the job.</span>
+        <span class="block italic">You’ll find no slop here.</span>
+      </h1>
+      <p class="measure mt-6 text-lg text-(--color-text-muted)">
+        We{' '}
+        <a href="/work/growing-a-travel-membership-from-6k-to-250k-members">
+          helped grow a client’s membership 40×
+        </a>{' '}
+        on senior craft alone. AI is how outcomes like that compound. We use it to the fullest, on
+        every surface where it earns its place, so senior hours land on the decisions that move your
+        numbers. Used well, it multiplies craft. Used lazily, it manufactures slop at scale:
+        generic, unreviewed output passed off as finished work. We do the former.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <Button href={primaryCta.href} size="lg">
+          {primaryCta.label}
+        </Button>
+        <Button href="/work" variant="secondary" size="lg">
+          See the outcomes
+        </Button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRINCIPLES — numbered cards, mirroring the homepage proof pillars. -->
+  <section class="section py-16">
+    <div class="container">
+      <p class="eyebrow">How we think about it</p>
+      <h2 class="mt-3 max-w-[20ch] text-3xl">Three rules we don’t bend.</h2>
+      <div class="mt-12 grid grid-cols-1 gap-4 md:grid-cols-3">
+        {principles.map((p) => (
+          <article class="rounded-lg border border-(--color-border) bg-(--color-surface) p-8">
+            <span class="font-mono text-sm tracking-[0.1em] text-(--color-accent-ink,--color-accent)">
+              {p.n}
+            </span>
+            <h3 class="mt-3 text-2xl">{p.title}</h3>
+            <p class="mt-3 text-(--color-text-muted)">{p.body}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- WHERE IT SHOWS UP — a definition list with discipline-accent left rules. -->
+  <section class="section py-16">
+    <div class="container">
+      <p class="eyebrow">Across the work</p>
+      <h2 class="mt-3 max-w-[20ch] text-3xl">Where it earns its place.</h2>
+      <p class="measure mt-4 text-lg text-(--color-text-muted)">
+        The same lifecycle we’ve sharpened over a decade of shipping, now with the toil compressed,
+        so senior attention lands where it counts.
+      </p>
+      <dl class="mt-12 mb-0 grid grid-cols-1 gap-6 md:grid-cols-2">
+        {surfaces.map(([term, def]) => (
+          <div class="border-l-[3px] border-(--color-primary) pl-4">
+            <dt class="font-display text-xl">{term}</dt>
+            <dd class="mt-2 ml-0 text-(--color-text-muted)">{def}</dd>
+          </div>
+        ))}
+      </dl>
+      <p class="measure mt-12 text-(--color-text-muted)">
+        All of the above is how we work. Need AI built into your own product? That’s an engagement
+        in its own right, held to the same bar: <a href="/ai-services">explore AI services</a> or{' '}
+        <a href={primaryCta.href}>start a project</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- THE NO-SLOP GUARANTEE — an ink surface, the page's emotional anchor. -->
+  <section class="section">
+    <div class="container">
+      <div class="surface-dark grid grid-cols-1 gap-8 rounded-xl border border-(--color-ink-panel-border) p-[clamp(1.5rem,1rem+3vw,3.5rem)] md:grid-cols-[1.1fr_1fr]">
+        <div>
+          <p class="eyebrow">The no-slop line</p>
+          <h2 class="mt-3 max-w-[18ch] text-3xl">Some things a model will never do for us.</h2>
+          <p class="mt-4 max-w-[46ch] text-stone-300">
+            The bar is the bar. AI changes how fast we get to the work, not the standard the work is
+            held to.
+          </p>
+        </div>
+        <ul class="m-0 grid list-none content-start gap-4 p-0" role="list">
+          {guardrails.map((g) => (
+            <li class="border-t-2 border-ember-500 pt-3 text-lg text-stone-25">{g}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA BAND -->
+  <section class="section pt-8">
+    <div class="container">
+      <CtaBand
+        title="Want leverage without the slop?"
+        sub="Tell us what you’re building. A senior team, sharpened by AI and accountable for outcomes, replies within one business day."
+      />
+    </div>
+  </section>
+</Base>

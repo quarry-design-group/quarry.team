@@ -1,0 +1,30 @@
+---
+title: Quarry Documentation
+description: The architecture, requirements, guides, and runbooks behind the quarry.team next-gen site.
+template: splash
+hero:
+  tagline: A browsable, searchable mirror of the repo's docs — architecture, requirements, guides, and runbooks.
+  actions:
+    - text: Content authoring guide
+      link: /guides/content-authoring/
+      icon: right-arrow
+    - text: Architecture decisions
+      link: /architecture/
+      icon: open-book
+      variant: minimal
+---
+
+This site mirrors the canonical documentation that lives in the
+[`quarry.team` monorepo](https://github.com/quarry-design-group/quarry.team) under
+`docs/`. Every page here is generated from that source at build time, so what you read
+is always what ships.
+
+## What's here
+
+- **[Guides](/guides/content-authoring/)** — content authoring and the design system.
+- **[Architecture](/architecture/)** — the Architecture Decision Records (ADRs) behind the build.
+- **[Requirements](/requirements/product-requirements/)** — the business, product, and non-functional requirements.
+- **[Runbooks](/runbooks/deploy/)** — how to bootstrap, develop, deploy, release, and respond to incidents.
+
+Each page links back to its source file in the repo. To change anything, edit the
+Markdown under `docs/` — this site regenerates from it.

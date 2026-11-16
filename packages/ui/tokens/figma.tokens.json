@@ -1,0 +1,126 @@
+{
+  "core": {
+    "color": {
+      "stone": {
+        "0": { "$type": "color", "$value": "#FFFFFF" },
+        "25": { "$type": "color", "$value": "#FAFAF7" },
+        "50": { "$type": "color", "$value": "#F4F4EF" },
+        "100": { "$type": "color", "$value": "#E9E9E2" },
+        "200": { "$type": "color", "$value": "#D6D6CC" },
+        "300": { "$type": "color", "$value": "#B8B8AC" },
+        "400": { "$type": "color", "$value": "#94948A" },
+        "500": { "$type": "color", "$value": "#6E6E66" },
+        "600": { "$type": "color", "$value": "#52524C" },
+        "700": { "$type": "color", "$value": "#3A3A36" },
+        "800": { "$type": "color", "$value": "#232320" },
+        "900": { "$type": "color", "$value": "#141413" },
+        "950": { "$type": "color", "$value": "#0B0B0A" }
+      },
+      "ink": { "$type": "color", "$value": "#0B0F1A" },
+      "ink-soft": { "$type": "color", "$value": "#3A3F4B" },
+      "blue": {
+        "50": { "$type": "color", "$value": "#EAF1FF" },
+        "100": { "$type": "color", "$value": "#D0E0FF" },
+        "300": { "$type": "color", "$value": "#6FA0F5" },
+        "500": { "$type": "color", "$value": "#0C53C7" },
+        "600": { "$type": "color", "$value": "#0A47AB" },
+        "700": { "$type": "color", "$value": "#083A8C" }
+      },
+      "ember": {
+        "500": { "$type": "color", "$value": "#FF5A1F" },
+        "600": { "$type": "color", "$value": "#E64A12" },
+        "700": { "$type": "color", "$value": "#C2410C" }
+      },
+      "discipline": {
+        "$description": "Discipline (categorical) — each also carries a `-tint` (pale chip background) and an `-ink` (text darkened to hold WCAG AA >=4.5:1 on that tint).",
+        "strategy": { "$type": "color", "$value": "#7A0CC7" },
+        "strategy-tint": { "$type": "color", "$value": "#F3E8FB" },
+        "strategy-ink": { "$type": "color", "$value": "#6B21A8" },
+        "design": { "$type": "color", "$value": "#06A269" },
+        "design-tint": { "$type": "color", "$value": "#E2F4ED" },
+        "design-ink": { "$type": "color", "$value": "#065F46" },
+        "engineering": { "$type": "color", "$value": "#0C53C7" },
+        "engineering-tint": { "$type": "color", "$value": "#EAF1FF" },
+        "engineering-ink": { "$type": "color", "$value": "#1E40AF" },
+        "ecommerce": { "$type": "color", "$value": "#FF680D" },
+        "ecommerce-tint": { "$type": "color", "$value": "#FDEADD" },
+        "ecommerce-ink": { "$type": "color", "$value": "#9A3412" },
+        "data": { "$type": "color", "$value": "#E99A01" },
+        "data-tint": { "$type": "color", "$value": "#FBF1DD" },
+        "data-ink": { "$type": "color", "$value": "#854D0E" }
+      },
+      "status": {
+        "success": { "$type": "color", "$value": "#06A269" },
+        "warning": { "$type": "color", "$value": "#E99A01" },
+        "danger": { "$type": "color", "$value": "#C8341F" },
+        "info": { "$type": "color", "$value": "#0C53C7" }
+      }
+    },
+    "font": {
+      "family": {
+        "$description": "Type families — the `<name> fallback` faces are metric-matched local fallbacks (fontaine) that occupy identical space pre-swap, so there is zero font-swap CLS. They exist only in built output.",
+        "display": {
+          "$type": "fontFamily",
+          "$value": "'Fraunces Variable', 'Fraunces fallback', Fraunces, Georgia, 'Times New Roman', serif"
+        },
+        "text": {
+          "$type": "fontFamily",
+          "$value": "'Hanken Grotesk Variable', 'Hanken fallback', 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        },
+        "mono": {
+          "$type": "fontFamily",
+          "$value": "'JetBrains Mono Variable', 'JetBrains fallback', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace"
+        }
+      }
+    },
+    "space": {
+      "1": { "$type": "dimension", "$value": "0.25rem" },
+      "2": { "$type": "dimension", "$value": "0.5rem" },
+      "3": { "$type": "dimension", "$value": "0.75rem" },
+      "4": { "$type": "dimension", "$value": "1rem" },
+      "5": { "$type": "dimension", "$value": "1.5rem" },
+      "6": { "$type": "dimension", "$value": "2rem" },
+      "7": { "$type": "dimension", "$value": "3rem" },
+      "8": { "$type": "dimension", "$value": "4rem" },
+      "9": { "$type": "dimension", "$value": "6rem" },
+      "10": { "$type": "dimension", "$value": "8rem" },
+      "11": { "$type": "dimension", "$value": "10rem" },
+      "12": { "$type": "dimension", "$value": "12.5rem" },
+      "section": {
+        "$type": "dimension",
+        "$value": "clamp(3rem, 2rem + 5vw, 6rem)",
+        "$description": "Vertical rhythm for page sections (one side). Every full-width band (.section, ToolsSection, 404) pads with this so adjacent sections stack to a consistent, design-system gap."
+      }
+    },
+    "radius": {
+      "sm": { "$type": "dimension", "$value": "4px" },
+      "md": { "$type": "dimension", "$value": "8px" },
+      "lg": { "$type": "dimension", "$value": "14px" },
+      "xl": { "$type": "dimension", "$value": "22px" },
+      "full": { "$type": "dimension", "$value": "9999px" }
+    },
+    "size": {
+      "container": { "$type": "dimension", "$value": "1200px" },
+      "container-wide": { "$type": "dimension", "$value": "1320px" },
+      "measure": { "$type": "dimension", "$value": "68ch" },
+      "header-height": {
+        "$type": "dimension",
+        "$value": "72px",
+        "$description": "Height of the sticky site header. Heroes that sit under the header, sticky rails, and the mobile menu's max-height offset by it."
+      }
+    },
+    "duration": {
+      "1": { "$type": "duration", "$value": "150ms" },
+      "2": { "$type": "duration", "$value": "250ms" },
+      "3": { "$type": "duration", "$value": "400ms" },
+      "4": { "$type": "duration", "$value": "600ms" },
+      "5": { "$type": "duration", "$value": "900ms" }
+    },
+    "easing": {
+      "out": { "$type": "cubicBezier", "$value": [0.2, 0, 0, 1] },
+      "in-out": { "$type": "cubicBezier", "$value": [0.4, 0, 0.2, 1] }
+    }
+  },
+  "$themes": [],
+  "$metadata": { "tokenSetOrder": ["core"] }
+}

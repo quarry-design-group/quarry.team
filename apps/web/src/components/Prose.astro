@@ -1,0 +1,95 @@
+---
+/**
+ * Prose — the reading column for rendered MDX bodies: posts, cases, roles,
+ * and policies. It owns the descendant rules for content the templates do not
+ * author (headings, paragraphs, images, links, photo credits, pullquotes), so
+ * every long-form template renders the same typography. The list rhythm sits
+ * in global.css beside the base list-marker rules. Layout (width, margins,
+ * text size) stays with the caller via `class`.
+ */
+interface Props {
+  class?: string;
+}
+const { class: cls } = Astro.props;
+---
+
+<div class:list={['prose', cls]}>
+  <slot />
+</div>
+
+<style>
+  /* Residual: rendered markdown body — descendants aren't addressable as utilities. */
+  /* Heading ladder: one type token per level above the text-lg body copy
+     (title 4xl → h2 3xl → h3 2xl → h4 xl), with more space above a heading
+     than below so each binds to the text it introduces. */
+  .prose :global(h2) {
+    font-size: var(--text-3xl);
+    margin-top: var(--space-7);
+    margin-bottom: var(--space-4);
+  }
+  .prose :global(h3) {
+    font-size: var(--text-2xl);
+    margin-top: var(--space-6);
+    margin-bottom: var(--space-3);
+  }
+  .prose :global(h4) {
+    font-size: var(--text-xl);
+    margin-top: var(--space-5);
+    margin-bottom: var(--space-2);
+  }
+  /* A subheading directly under its parent heading sits close to it. */
+  .prose :global(:is(h2, h3) + :is(h3, h4)) {
+    margin-top: var(--space-5);
+  }
+  .prose :global(:is(h2, h3, h4):first-child) {
+    margin-top: 0;
+  }
+  .prose :global(p) {
+    margin-block: var(--space-4);
+  }
+  .prose :global(img) {
+    border-radius: var(--radius-lg);
+    margin-block: var(--space-5);
+  }
+  .prose :global(a) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  /* Photo credits (tagged by the rehype plugin in astro.config.mjs) → a small,
+     subtle caption tucked beneath the preceding image. */
+  .prose :global(.credit) {
+    margin-top: calc(-1 * var(--space-3));
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-align: center;
+    font-style: normal;
+  }
+  .prose :global(.credit a) {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  /* Blockquotes presented as pullquotes. */
+  .prose :global(blockquote) {
+    margin: var(--space-6) 0;
+    padding-left: var(--space-5);
+    border-left: 3px solid var(--color-accent);
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    line-height: 1.3;
+    font-style: italic;
+    color: var(--color-text);
+  }
+  .prose :global(blockquote p) {
+    margin-block: var(--space-2);
+  }
+  /* A multi-paragraph quote's closing paragraph is its attribution; a
+     single-paragraph quote is all quote. */
+  .prose :global(blockquote p:not(:only-child):last-child) {
+    font-family: var(--font-text);
+    font-style: normal;
+    font-size: var(--text-base);
+    color: var(--color-text-muted);
+    margin-top: var(--space-3);
+  }
+</style>

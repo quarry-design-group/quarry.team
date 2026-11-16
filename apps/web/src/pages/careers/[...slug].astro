@@ -1,0 +1,97 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import Prose from '@/components/Prose.astro';
+import SubmissionForm from '@/components/SubmissionForm.astro';
+import { hiringCountries, site } from '@/lib/site';
+
+export async function getStaticPaths() {
+  const roles = (await getCollection('roles')).filter((r) => !r.data.draft);
+  return roles.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { data } = entry;
+const { Content } = await render(entry);
+const facts = [
+  ['Team', data.team],
+  ['Location', data.location],
+  ['Type', data.type],
+] as [string, string][];
+
+// Google JobPosting employmentType vocabulary.
+const employmentTypeMap: Record<string, string> = {
+  'Full-time': 'FULL_TIME',
+  'Part-time': 'PART_TIME',
+  Contract: 'CONTRACTOR',
+  Temporary: 'TEMPORARY',
+  Internship: 'INTERN',
+};
+const jobLd = {
+  '@context': 'https://schema.org',
+  '@type': 'JobPosting',
+  title: data.title,
+  description: data.summary,
+  datePosted: data.datePosted.toISOString().slice(0, 10),
+  ...(data.validThrough ? { validThrough: data.validThrough.toISOString().slice(0, 10) } : {}),
+  employmentType: employmentTypeMap[data.type] ?? 'FULL_TIME',
+  // Fully remote roles. A TELECOMMUTE posting names the countries it hires
+  // from; Google has no worldwide value, so the list is every country the
+  // firm can hire in (see hiringCountries).
+  jobLocationType: 'TELECOMMUTE',
+  applicantLocationRequirements: hiringCountries.map((name) => ({ '@type': 'Country', name })),
+  // Inlined so the posting reads as a standalone document.
+  hiringOrganization: { '@type': 'Organization', name: site.legalName, sameAs: site.url },
+  directApply: true,
+};
+---
+
+<Base title={data.title} description={data.summary} type="article" jsonLd={[jobLd]}>
+  <article class="section">
+    <div class="container max-w-(--measure)">
+      <p class="eyebrow">
+        <a class="text-inherit underline underline-offset-2" href="/careers">
+          Careers
+        </a>{' '}
+        / {data.team}
+      </p>
+      <h1 class="mt-3 text-4xl">{data.title}</h1>
+      <p class="mt-4 text-lg text-(--color-text-muted)">{data.summary}</p>
+
+      <ul
+        role="list"
+        class="my-8 flex list-none flex-wrap gap-8 border-y border-(--color-border) px-0 py-6"
+      >
+        {facts.map(([k, v]) => (
+          <li>
+            <span class="block font-mono text-xs tracking-[0.08em] uppercase text-(--color-text-muted)">
+              {k}
+            </span>
+            <span class="font-semibold">{v}</span>
+          </li>
+        ))}
+      </ul>
+
+      <Prose class="text-lg">
+        <Content />
+      </Prose>
+
+      {/* The card grounds the form at full column width (careers index band's card language). */}
+      <div class="mt-12" id="apply">
+        <div class="rounded-lg border border-(--color-border) bg-(--color-surface) p-[clamp(var(--space-4),2.5vw,var(--space-6))]">
+          <SubmissionForm
+            kind="careers"
+            role={data.title}
+            loom
+            heading="Apply for this role"
+            intro={`Applying for ${data.title}. Record a short Loom introducing yourself, attach your best links, and tell us why this is a fit.`}
+            submitLabel="Submit application"
+          />
+        </div>
+        <a class="mt-6 inline-block text-sm text-(--color-text-muted)" href="/careers">
+          ← All open roles
+        </a>
+      </div>
+    </div>
+  </article>
+</Base>

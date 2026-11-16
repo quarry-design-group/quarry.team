@@ -1,0 +1,62 @@
+---
+# Cited in the /compliance evidence ledger (apps/web/src/lib/compliance.ts) — keep that claim in sync.
+title: 'Designing a HIPAA-compliant infrastructure for a startup in the mental health industry'
+client: 'Confidential'
+summary: 'A HIPAA-compliant, multi-tenant architecture on AWS for a mental health startup: isolated ePHI, full audit logging, and a clear roadmap to implementation.'
+disciplines: ['design', 'engineering', 'data', 'strategy']
+industry: 'Healthcare'
+outcome:
+  kicker: 'Audit-ready.'
+  headline: 'Multi-tenant ePHI architecture, HIPAA-compliant by design, on AWS.'
+releasedDate: 2024-08-09
+hero: ./hero.jpg
+heroAlt: 'Therapy session with a client seated on a couch and a counselor across a glass table holding an assessment clipboard'
+featured: false
+order: 11
+---
+
+import ArchitectureDiagram from '@/components/ArchitectureDiagram.astro';
+import architecture from './architecture';
+
+## The Challenge
+
+A mental health startup needed to design a highly secure and HIPAA-compliant infrastructure for their multi-tenant healthcare application.
+
+The challenge for Quarry was to create an architecture that would:
+
+- Ensure HIPAA compliance
+- Provide robust security measures
+- Support multiple user types (two clinician roles and patients)
+- Allow for future scalability
+- Minimize legal exposure and mitigate risk
+
+## The Solution
+
+Quarry designed a comprehensive HIPAA-compliant architecture leveraging AWS services.
+
+<ArchitectureDiagram diagram={architecture} />
+
+We began with virtual private clouds, essentially isolated environments for each part of the system. This separation adds a strong layer of security, keeping user ePHI isolated to only production environments and further isolated to specific services within production to mitigate the risk of leakage.
+
+Logging is a crucial part of this setup. We implemented CloudWatch and CloudTrail, with flow logs on every VPC. This gives us a detailed record of all activity that establishes a chain of custody for all data as well as a log of all system access. These are vital requirements for HIPAA compliance. If there’s ever an issue, we can trace exactly what happened and when, plus be proactively notified in the event of unexpected access to ePHI.
+
+Data storage and backups use S3 buckets. Access control is managed through IAM, with SNS-driven alerts on unexpected access to ePHI, ensuring only authorized users can reach specific parts of the system and meeting HIPAA’s minimum-necessary access requirement.
+
+The main application is designed to handle three types of users: two clinician roles and patients. It’s a multi-tenant setup, but each group’s data is kept separate and secure.
+
+We’ve integrated some essential services too. There’s a headless CMS for content management, Twilio for SMS, and SendGrid for emails. We also developed a Facebook app that publishes anonymized, de-identified case data to professional groups.
+
+Finally, we created a separate staging environment that mirrors the production setup. This allows for thorough testing before any changes go live.
+
+## The Results
+
+While the full implementation is pending future funding, the infrastructure design itself has been a significant deliverable, offering the startup:
+
+- A clear roadmap for HIPAA-compliant infrastructure
+- Significantly reduced legal exposure and risk
+- A scalable architecture supporting future growth
+- Enhanced data security and privacy for all user types
+- Comprehensive audit capabilities for potential breach investigations
+- A foundation for building trust with healthcare providers and patients
+
+The design’s focus on isolating services, maintaining detailed logs, and implementing multi-layered security measures positions the startup to confidently expand its services while maintaining strict HIPAA compliance.

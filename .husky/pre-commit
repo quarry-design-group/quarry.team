@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# Regenerate the token projections when their source is staged, so the committed
+# tokens.css + figma.tokens.json can never lag tokens.json. CI gates this too
+# (git diff --exit-code); the hook just keeps you from ever hitting that gate.
+if git diff --cached --name-only --diff-filter=ACM | grep -qxF 'packages/ui/tokens/tokens.json'; then
+  echo "[pre-commit] tokens.json staged — regenerating tokens.css + figma.tokens.json"
+  pnpm tokens
+  git add packages/ui/tokens/tokens.css packages/ui/tokens/figma.tokens.json
+fi
+
+# Format, lint, and normalize staged files (prettier, eslint --fix, image budgets).
+pnpm exec lint-staged

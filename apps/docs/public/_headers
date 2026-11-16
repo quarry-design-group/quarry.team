@@ -1,0 +1,18 @@
+# Security headers for docs.quarry.team (the assets-only quarry-docs Worker
+# serves this file from dist/ verbatim; docs/runbooks/deploy.md, "Docs site").
+#
+# The CSP allows what the Starlight build needs and nothing else. Starlight
+# ships inline <script> blocks and inline style attributes that change with
+# every release, so script-src and style-src carry 'unsafe-inline'. Pagefind
+# search compiles WebAssembly in a same-origin web worker, which needs
+# 'wasm-unsafe-eval' and worker-src 'self'. Every other directive is closed to
+# third parties: no external origin is allowed anywhere, no plugins, no
+# framing.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Content-Security-Policy: default-src 'self'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; font-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests

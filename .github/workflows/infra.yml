@@ -1,0 +1,214 @@
+name: Infra (Terraform)
+
+# Provisions Cloudflare infrastructure (zone config, D1, R2, Turnstile, WAF).
+# The site Worker itself is shipped by the Deploy Web workflow (wrangler).
+# Requires repo secrets:
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY  (for the S3-compatible TF state backend)
+#   TERRAFORM_GITHUB_APP_PEM   (the Terraform GitHub App's private key: the
+#                               GitHub provider writes the Turnstile secrets into
+#                               the staging and production environments,
+#                               infra/github.tf)
+# and repo variables TERRAFORM_GITHUB_APP_ID, TERRAFORM_GITHUB_APP_INSTALLATION_ID.
+#
+# Dependabot-triggered runs see only the repository's *Dependabot* secrets, so
+# the same names are stored there too, holding read-only credentials (a
+# read-only Cloudflare token, a read-only R2 token, and the read-only Terraform
+# Plan GitHub App, whose id and installation id are Dependabot secrets as well:
+# TERRAFORM_GITHUB_APP_ID, TERRAFORM_GITHUB_APP_INSTALLATION_ID). See
+# infra/README.md "Dependabot secrets" and ADR 0018.
+#
+# plan runs on every PR that touches infra/ or this workflow; apply runs on
+# manual dispatch only (gated).
+
+on:
+  # No `paths` filter: `Terraform plan` is a required check, and a
+  # path-filtered workflow never reports on the PRs it skips, which would block
+  # them forever. The job's first step decides whether this PR needs a plan;
+  # a PR that doesn't passes in seconds.
+  pull_request:
+    branches: [main]
+  # Weekly drift detection: dashboard/wrangler-made changes diverge from the
+  # Terraform definition silently; this fails (and notifies) on any diff.
+  schedule:
+    - cron: '0 13 * * 1' # Mondays 13:00 UTC
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'plan or apply'
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply]
+
+# Read-only: this workflow talks to Cloudflare/R2 with its own credentials;
+# the GITHUB_TOKEN only checks out code (the setup-terraform PR-comment
+# feature is disabled below, so no pull-requests scope is needed).
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: 1.11.4 # >=1.10 for native S3-backend lockfile locking (R2 conditional writes)
+  WORKDIR: infra
+
+jobs:
+  terraform:
+    # On pull requests this is the required status check `Terraform plan`. The
+    # job has no `if`: a skipped job can report under its unevaluated name and
+    # never match the required check, so every gate lives in the first step.
+    name: Terraform ${{ github.event.inputs.action || 'plan' }}
+    runs-on: ubuntu-latest
+    # Applies, dispatched plans, and the drift check take the state lock, so
+    # they run one at a time. PR plans run with -lock=false (read-only, below),
+    # so each PR only replaces its own superseded run and never queues behind,
+    # or cancels, another PR or the drift check.
+    concurrency:
+      group: ${{ github.event_name == 'pull_request' && format('infra-pr-{0}', github.event.pull_request.number) || 'infra-terraform' }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    defaults:
+      run:
+        working-directory: ${{ env.WORKDIR }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      # The GitHub provider (infra/github.tf) authenticates as the Terraform
+      # GitHub App: plans and the drift check read the environment secrets'
+      # metadata, applies write them. Installation tokens last an hour.
+      # A Dependabot run takes the read-only plan App's ids from its Dependabot
+      # secrets; every other run has no such secret and falls through to the
+      # repository variables.
+      GITHUB_APP_ID: ${{ secrets.TERRAFORM_GITHUB_APP_ID || vars.TERRAFORM_GITHUB_APP_ID }}
+      GITHUB_APP_INSTALLATION_ID: ${{ secrets.TERRAFORM_GITHUB_APP_INSTALLATION_ID || vars.TERRAFORM_GITHUB_APP_INSTALLATION_ID }}
+      GITHUB_APP_PEM_FILE: ${{ secrets.TERRAFORM_GITHUB_APP_PEM }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A PR checks out its merge commit; its first parent is the base, so
+          # HEAD^1..HEAD is exactly what the PR changes.
+          fetch-depth: 2
+
+      # Decides whether this run plans, and how strictly. Errors here fail the
+      # job (and so the required check): the gate fails closed.
+      #   plan=false  — a PR that touches neither infra/ nor this workflow, or
+      #                 a fork PR (forks receive no secrets, and `terraform plan`
+      #                 would evaluate the fork's HCL with them in the job env).
+      #   strict=true — a Dependabot PR (by PR author, so a maintainer's push to
+      #                 the branch stays strict): -detailed-exitcode turns any
+      #                 diff into a red check, which holds the auto-merge that
+      #                 the `immediate` tier armed. Human PR plans stay
+      #                 informational.
+      - name: Decide plan
+        id: gate
+        working-directory: .
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != pull_request ]; then
+            echo "plan=true" >> "$GITHUB_OUTPUT"
+            echo "strict=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo "::notice::Fork PR: no plan (forks receive no secrets); a maintainer reviews infra changes by hand."
+            echo "plan=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          if ! grep -qE '^(infra/|\.github/workflows/infra\.yml$)' <<<"$changed"; then
+            echo "No infra/ or infra.yml changes: nothing to plan."
+            echo "plan=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "plan=true" >> "$GITHUB_OUTPUT"
+          if [ "$PR_AUTHOR" = 'dependabot[bot]' ]; then
+            echo "Dependabot PR: strict plan (any diff fails this check)."
+            echo "strict=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "strict=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        if: ${{ steps.gate.outputs.plan == 'true' }}
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          # The wrapper teescript pollutes $(terraform output -raw ...) command
+          # substitution; we don't use its PR-comment feature, so run the real
+          # binary.
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        if: ${{ steps.gate.outputs.plan == 'true' }}
+        run: terraform fmt -check -recursive
+
+      # backend.tf intentionally leaves bucket/key/endpoint unset (no
+      # account-specific values in source) — they are supplied here. The s3
+      # backend reads its credentials from AWS_ACCESS_KEY_ID/SECRET above.
+      - name: Terraform init
+        if: ${{ steps.gate.outputs.plan == 'true' }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=quarry-tf-state" \
+            -backend-config="key=quarry-team/production.tfstate" \
+            -backend-config="endpoints={s3=\"https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com\"}"
+
+      - name: Terraform validate
+        if: ${{ steps.gate.outputs.plan == 'true' }}
+        run: terraform validate
+
+      # All variables have committed defaults except the account id, which is
+      # supplied from the secret. (environments/production.tfvars is gitignored
+      # — only the .example ships — so no -var-file here.)
+      #
+      # PR plans skip the state lock: a plan never writes state, so without the
+      # lockfile write it needs only read access to the bucket (the Dependabot
+      # R2 token is read-only) and can never leave a stale .tflock behind.
+      - name: Terraform plan
+        if: ${{ steps.gate.outputs.plan == 'true' && github.event_name != 'schedule' && github.event.inputs.action != 'apply' }}
+        env:
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EVENT: ${{ github.event_name }}
+          STRICT: ${{ steps.gate.outputs.strict }}
+        run: |
+          args=(-input=false)
+          [ "$EVENT" = pull_request ] && args+=(-lock=false)
+          [ "$STRICT" = true ] && args+=(-detailed-exitcode)
+          set +e
+          terraform plan "${args[@]}"
+          code=$?
+          set -e
+          if [ "$STRICT" = true ] && [ "$code" -eq 2 ]; then
+            echo "::error::The plan is not empty. A Dependabot provider bump must plan No changes to merge on its own. Read the plan; if the diff is expected provider churn, merge by hand and dispatch apply from main (infra/README.md)."
+          fi
+          exit "$code"
+
+      # Scheduled drift check: -detailed-exitcode makes ANY diff exit 2 → the
+      # run fails → GitHub notifies. Human PR plans stay informational (above).
+      - name: Terraform drift check (scheduled)
+        if: ${{ github.event_name == 'schedule' }}
+        run: terraform plan -input=false -detailed-exitcode
+        env:
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Applies reconcile the live account, so they run only from main: HCL on
+      # an unmerged branch is plan-only.
+      - name: Refuse an apply off main
+        if: ${{ github.event.inputs.action == 'apply' && github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::apply runs only from main (this run: $GITHUB_REF)"
+          exit 1
+
+      - name: Terraform apply
+        if: ${{ github.event.inputs.action == 'apply' }}
+        run: terraform apply -input=false -auto-approve
+        env:
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Surface the non-secret ids needed to fill apps/web/wrangler.toml.
+      - name: Terraform outputs (post-apply)
+        if: ${{ github.event.inputs.action == 'apply' }}
+        run: terraform output

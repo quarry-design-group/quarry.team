@@ -1,0 +1,40 @@
+---
+title: 'Rebuilding a European travel-membership storefront on a headless Jamstack'
+client: 'Harvest Hosts'
+summary: 'We rebuilt Brit Stops, Harvest Hosts’ European travel membership, as a headless Jamstack storefront serving four reseller markets from one codebase.'
+disciplines: ['design', 'engineering', 'ecommerce', 'strategy']
+industry: 'Travel & Membership'
+outcome:
+  kicker: 'Replatformed.'
+  headline: 'One headless storefront serves Brit Stops direct and through resellers in four European markets.'
+releasedDate: 2026-05-17
+hero: ./hero.jpg
+heroAlt: 'Yellow vintage VW camper van with pop-top roof parked by a lake at sunset, doors open and a backpack on the ground'
+featured: true
+order: 1
+heroCredit: 'Photo by [Kevin Schmid](https://unsplash.com/@lighttouchedphotography?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash) on [Unsplash](https://unsplash.com/photos/brown-van-under-the-tree-during-sunset-Mta8r0bxhbo?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash)'
+---
+
+## The Challenge
+
+[Brit Stops](https://www.britstops.com/) represented Harvest Hosts’ expansion beyond its established North American market and into Europe. The product was an annual guide and companion app that connected motorhome and campervan travellers with hundreds of UK host sites – farms, pubs, vineyards and farm shops – offering free overnight stays. It served a pan-European customer base, sold direct and through resellers in Germany, the Netherlands, Spain and Norway, on an annual cycle that refreshed every March.
+
+The storefront ran on an ageing, hand-rolled PHP monolith: procedural page scripts for the shop, basket, checkout and membership join flows, a bespoke class autoloader, almost no dependency tooling, and a Stripe SDK pinned to v7.8.0 with no documentation available. Routine content changes required a developer, the codebase was risky to extend, and the annual product cadence demanded a storefront the marketing team could run without engineering.
+
+As a newly acquired brand entering the portfolio, Brit Stops needed to align with Harvest Hosts’ modern, maintainable technology standards while keeping its distinct brand and its multi-reseller commerce intact.
+
+## The Solution
+
+Quarry replatformed Brit Stops onto a modern headless architecture. We built a new storefront on [Next.js](https://nextjs.org/) with React, TypeScript and Tailwind, using server rendering and static generation for SEO and speed, with a blog, sitemap, and country-based internationalisation for the European audience.
+
+We decoupled content into a headless WordPress CMS using Atlas Content Modeler for structured content types, exposed over [WPGraphQL](https://www.wpgraphql.com/) and consumed through Apollo Client, with Yoast for SEO – including the documented integration patches needed to make Atlas Content Modeler, Yoast and GraphQL cooperate. This handed day-to-day control of listings, pages and blog content to the marketing team.
+
+We modernised payments, moving off the undocumented legacy Stripe v7 integration to a modern [Stripe](https://stripe.com/) Checkout flow that supported one-time book purchases alongside yearly and worldwide subscription tiers.
+
+Finally, we added two lightweight [Cloudflare Workers](https://workers.cloudflare.com/) edge services – member authentication and a configurable promotional offer bar injected at the edge – each deployable independently of the storefront.
+
+![Brit Stops storefront homepage with motorhome stopover search](./image-1.png) ![Brit Stops host discovery page with filters and an interactive UK and Ireland map](./image-2.png) ![Brit Stops Become a Host application page](./image-3.png) ![Brit Stops blog landing page with featured articles](./image-4.png)
+
+## The Results
+
+One headless storefront serves Brit Stops direct and through resellers in Germany, the Netherlands, Spain and Norway, from a single codebase. Listings, pages and blog content live with the marketing team in the headless CMS, and the annual March refresh needs no engineer.

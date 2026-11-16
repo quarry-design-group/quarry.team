@@ -1,0 +1,12 @@
+pnpm-lock.yaml
+dist
+.astro
+coverage
+**/*.min.*
+
+# Generated docs-site mirror — projected from `docs/` by apps/docs/scripts/sync-docs.mjs.
+# Edit `docs/`, not these; the CI freshness gate guards them.
+apps/docs/src/content/docs/architecture
+apps/docs/src/content/docs/requirements
+apps/docs/src/content/docs/guides
+apps/docs/src/content/docs/runbooks

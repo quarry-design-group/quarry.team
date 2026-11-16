@@ -1,0 +1,59 @@
+---
+/**
+ * SearchForm — the site search form: a plain GET to /search that works with
+ * JavaScript off. The island on the search page listens to this form by its
+ * `data-search-form` hook and keeps every field's name, so the fragment it
+ * fetches and the page a submit lands on take the same query string.
+ */
+import Button from '@/components/Button.astro';
+import Select from '@/components/Select.astro';
+import { searchKindFilterLabels, searchKinds } from '@/lib/search/documents';
+import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH, type SearchParams } from '@/lib/search/query';
+
+interface Props {
+  params: SearchParams;
+}
+const { params } = Astro.props;
+
+const kindOptions = searchKinds.map((k) => ({
+  value: k,
+  label: searchKindFilterLabels[k],
+}));
+
+// One skin for the query field and the scope select; <Select size="lg"> owns
+// the select's box metrics, chevron and height match with the query field.
+const skin =
+  'rounded-md border-(--color-border-strong) bg-(--color-surface) text-base text-(--color-text) hover:border-(--color-text)';
+const field = `w-full border px-4 py-3 placeholder:text-(--color-text-muted) ${skin}`;
+---
+
+<form class="mt-8" action="/search" method="get" role="search" data-search-form>
+  <label class="block text-base font-medium" for="search-q">
+    Search the site
+  </label>
+  <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+    <input
+      class={field}
+      id="search-q"
+      name="q"
+      type="search"
+      value={params.q}
+      minlength={MIN_QUERY_LENGTH}
+      maxlength={MAX_QUERY_LENGTH}
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="Try “Shopify”, “HIPAA” or a client name"
+    />
+    <Select size="lg" fieldClass={skin} name="kind" aria-label="Limit results to">
+      <option value="">Everything</option>
+      {kindOptions.map((o) => (
+        <option value={o.value} selected={params.kind === o.value}>
+          {o.label}
+        </option>
+      ))}
+    </Select>
+    <Button type="submit" size="md">
+      Search
+    </Button>
+  </div>
+</form>

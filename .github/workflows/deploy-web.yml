@@ -1,0 +1,297 @@
+name: Deploy Web (Cloudflare Worker)
+
+# Builds the Astro site (static assets + same-origin /api/* form routes) and
+# deploys it as a Cloudflare Worker with Static Assets via wrangler, then
+# applies any pending D1 migrations. Two environments (ADR-0013):
+#
+#   staging    — staging.quarry.team. Every push to main that touches the
+#                site (the `paths` filter below) deploys here while
+#                STAGING_DEPLOY_ENABLED=true.
+#   production — quarry.team/www. The same pushes deploy here while
+#                DEPLOY_ENABLED=true; unsetting it is the emergency stop.
+#                Same build pipeline, same Worker code.
+#
+# The @astrojs/cloudflare adapter resolves wrangler.toml per environment at
+# BUILD time (CLOUDFLARE_ENV selects [env.staging]) and emits the deployable
+# config to dist/server/wrangler.json — all wrangler commands target that file.
+#
+# Requires repo secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
+# PUBLIC_TURNSTILE_SITE_KEY + PUBLIC_TURNSTILE_GRIEVANCES_SITE_KEY (build-time). D1 ids (not secrets) live in
+# apps/web/wrangler.toml — fill once from terraform outputs after first apply.
+#
+# The Worker's runtime secrets live in the `staging` and `production` GitHub
+# environments and ship with every deploy: the `worker-secrets` map below hands
+# the secrets step exactly the WORKER_* secrets, by name, and
+# .github/scripts/worker-secrets.mjs writes them to a file that `wrangler deploy
+# --secrets-file` attaches to the new version (infra/README.md, "Worker runtime
+# secrets"). No other secret reaches that step. A secret missing from the
+# environment keeps its current value. A new Worker secret is one line in the
+# map; apps/web/src/lib/worker-secrets-map.test.ts fails CI when the code reads
+# a WORKER_* name the map lacks.
+#
+# Triggers: a push to main deploys staging, then production. A manual run
+# deploys staging from any branch (`target: staging`, the default) — the way
+# to exercise a branch on staging.quarry.team before it merges; production
+# deploys only from main (`target: staging-and-production`).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/ui/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-web.yml'
+      # The post-deploy smoke is part of the deploy; a change to it must be
+      # exercised by a real deploy, not wait for the next site change.
+      - 'tests/e2e/production.spec.ts'
+      - 'playwright.config.ts'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'staging (any branch) or staging-and-production (main only)'
+        required: true
+        default: staging
+        type: choice
+        options: [staging, staging-and-production]
+
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: true
+
+# Deploys authenticate to Cloudflare with CLOUDFLARE_API_TOKEN; the
+# GITHUB_TOKEN is only used for checkout, so keep it read-only.
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 24
+  PNPM_VERSION: 10.14.0
+
+jobs:
+  deploy-staging:
+    name: Deploy staging (staging.quarry.team)
+    runs-on: ubuntu-latest
+    # Enabled once infra is provisioned and the staging secrets are set
+    # (repo variable STAGING_DEPLOY_ENABLED=true; bootstrap §6).
+    if: ${{ vars.STAGING_DEPLOY_ENABLED == 'true' }}
+    environment:
+      name: staging
+      url: https://staging.quarry.team
+    # One staging deploy at a time across branches: a branch dispatch and a
+    # push to main queue, so migrations and deploys never interleave.
+    concurrency:
+      group: deploy-web-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build design tokens
+        run: pnpm --filter @quarry/ui build
+      - name: Build site (Astro + Cloudflare adapter, staging env)
+        run: pnpm --filter @quarry/web build
+        env:
+          CLOUDFLARE_ENV: staging
+          SITE_URL: https://staging.quarry.team
+          PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.PUBLIC_TURNSTILE_SITE_KEY }}
+          PUBLIC_TURNSTILE_GRIEVANCES_SITE_KEY: ${{ secrets.PUBLIC_TURNSTILE_GRIEVANCES_SITE_KEY }}
+
+      - name: Apply D1 migrations (staging, remote)
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          packageManager: pnpm
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: d1 migrations apply marketing-site-form-submissions-staging --remote -c dist/server/wrangler.json
+
+      - name: Write the Worker secrets file (staging environment)
+        # The Worker's secrets, by name, and nothing else: the step never sees
+        # the repository's or organization's other secrets. Reused by the
+        # production job (*worker-secrets).
+        env: &worker-secrets
+          WORKER_TURNSTILE_SECRET: ${{ secrets.WORKER_TURNSTILE_SECRET }}
+          WORKER_TURNSTILE_GRIEVANCES_SECRET: ${{ secrets.WORKER_TURNSTILE_GRIEVANCES_SECRET }}
+          WORKER_RESEND_API_KEY: ${{ secrets.WORKER_RESEND_API_KEY }}
+          WORKER_FORM_SUBMISSIONS_NOTIFY_TO: ${{ secrets.WORKER_FORM_SUBMISSIONS_NOTIFY_TO }}
+          WORKER_FORM_SUBMISSIONS_NOTIFY_FROM: ${{ secrets.WORKER_FORM_SUBMISSIONS_NOTIFY_FROM }}
+          WORKER_FORM_SUBMISSIONS_WEBHOOK_URL: ${{ secrets.WORKER_FORM_SUBMISSIONS_WEBHOOK_URL }}
+          WORKER_FORM_SUBMISSIONS_IP_HASH_KEY: ${{ secrets.WORKER_FORM_SUBMISSIONS_IP_HASH_KEY }}
+          WORKER_GRIEVANCE_SIGNING_KEY: ${{ secrets.WORKER_GRIEVANCE_SIGNING_KEY }}
+          WORKER_NOTION_TOKEN: ${{ secrets.WORKER_NOTION_TOKEN }}
+          WORKER_GRIEVANCE_NOTIFY_TO: ${{ secrets.WORKER_GRIEVANCE_NOTIFY_TO }}
+          WORKER_GRIEVANCE_NOTIFY_BACKUP_TO: ${{ secrets.WORKER_GRIEVANCE_NOTIFY_BACKUP_TO }}
+        run: node .github/scripts/worker-secrets.mjs "$RUNNER_TEMP/worker-secrets.json"
+
+      - name: Deploy Worker (staging)
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          packageManager: pnpm
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: deploy -c dist/server/wrangler.json --secrets-file ${{ runner.temp }}/worker-secrets.json
+
+      - name: Remove the Worker secrets file
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/worker-secrets.json"
+
+  deploy-production:
+    name: Deploy production (quarry.team)
+    runs-on: ubuntu-latest
+    # Production deploys on every push to main that touches the site, behind
+    # the repo variable DEPLOY_ENABLED=true (the emergency stop; bootstrap §9);
+    # the apex/www custom-domain routes attach to this Worker on deploy. Only
+    # main deploys production: a push, or a manual run with
+    # `target: staging-and-production`. The production environment's
+    # deployment branch policy (main only) enforces the same rule.
+    if: >-
+      ${{ vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
+          (github.event_name == 'push' || inputs.target == 'staging-and-production') }}
+    environment:
+      name: production
+      url: https://quarry.team
+    # `issues: write` only so a failed post-deploy smoke can open its incident
+    # issue; everything else stays read-only.
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build design tokens
+        run: pnpm --filter @quarry/ui build
+      - name: Build site (Astro + Cloudflare adapter)
+        run: pnpm --filter @quarry/web build
+        env:
+          SITE_URL: https://quarry.team
+          PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.PUBLIC_TURNSTILE_SITE_KEY }}
+          PUBLIC_TURNSTILE_GRIEVANCES_SITE_KEY: ${{ secrets.PUBLIC_TURNSTILE_GRIEVANCES_SITE_KEY }}
+
+      # The version serving traffic right now is the rollback target if the
+      # post-deploy smoke fails. Captured before the deploy so the rollback
+      # never has to guess which of the two newest versions was the good one.
+      - name: Record the live version (rollback target)
+        id: live
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          id=$(pnpm exec wrangler deployments list --json -c dist/server/wrangler.json 2>/dev/null \
+                | jq -r 'if type == "array" and length > 0 then (max_by(.created_on) | .versions[0].version_id) else empty end')
+          if [ -z "$id" ]; then
+            id=$(pnpm exec wrangler versions list --json -c dist/server/wrangler.json 2>/dev/null \
+                  | jq -r 'if type == "array" and length > 0 then (max_by(.metadata.created_on) | .id) else empty end')
+          fi
+          echo "live version: ${id:-<none — first deploy>}"
+          echo "version_id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Apply D1 migrations (remote)
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          packageManager: pnpm
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: d1 migrations apply marketing-site-form-submissions --remote -c dist/server/wrangler.json
+
+      - name: Write the Worker secrets file (production environment)
+        env: *worker-secrets
+        run: node .github/scripts/worker-secrets.mjs "$RUNNER_TEMP/worker-secrets.json"
+
+      - name: Deploy Worker
+        id: deploy
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          packageManager: pnpm
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: deploy -c dist/server/wrangler.json --secrets-file ${{ runner.temp }}/worker-secrets.json
+
+      - name: Remove the Worker secrets file
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/worker-secrets.json"
+
+      # Post-deploy verification (ADR-0018): a short smoke against the live
+      # site — routing, edge headers, the on-demand API route, axe on the home
+      # page. It is what makes auto-merged dependency bumps safe to ship
+      # straight to production: a failure rolls the Worker back to the version
+      # recorded above and opens an incident issue.
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Post-deploy smoke (live site)
+        id: smoke
+        env:
+          SMOKE_BASE_URL: https://quarry.team
+        run: pnpm exec playwright test
+
+      - name: Roll back to the previous version
+        if: ${{ failure() && steps.deploy.outcome == 'success' && steps.live.outputs.version_id != '' }}
+        id: rollback
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION_ID: ${{ steps.live.outputs.version_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          pnpm exec wrangler rollback "$VERSION_ID" -y -c dist/server/wrangler.json \
+            -m "auto-rollback: post-deploy smoke failed for ${GITHUB_SHA::7} ($RUN_URL)"
+
+      - name: Re-check the live site after rollback
+        if: ${{ failure() && steps.rollback.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          SMOKE_BASE_URL: https://quarry.team
+        run: pnpm exec playwright test
+
+      - name: Open an incident issue
+        if: ${{ failure() && steps.deploy.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ROLLED_BACK: ${{ steps.rollback.outcome == 'success' }}
+          VERSION_ID: ${{ steps.live.outputs.version_id }}
+        run: |
+          if [ "$ROLLED_BACK" = "true" ]; then
+            state="Production was rolled back automatically to version \`$VERSION_ID\`."
+          else
+            state="**No automatic rollback happened** (no prior version recorded, or the rollback itself failed) — production may be serving the bad build. Roll back by hand: \`wrangler rollback\` per docs/runbooks/deploy.md."
+          fi
+          gh issue create --repo "$REPO" \
+            --title "Post-deploy smoke failed on main @ ${GITHUB_SHA::7}" \
+            --label incident \
+            --body "$(printf '%s\n\n%s\n\n%s' \
+              "The production smoke suite (tests/e2e/production.spec.ts) failed after deploying \`$GITHUB_SHA\`. Run: $RUN_URL" \
+              "$state" \
+              "Next: read the Playwright report in the run artifacts, fix forward on a branch, and let the deploy workflow redeploy. See docs/runbooks/incident-response.md.")"
+
+      - name: Upload smoke report
+        if: ${{ !cancelled() && steps.smoke.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: production-smoke-report
+          path: playwright-report
+          retention-days: 14

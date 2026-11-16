@@ -1,0 +1,25 @@
+---
+import { getCollection, render } from 'astro:content';
+import Policy from '@/layouts/Policy.astro';
+
+/**
+ * Static template for the non-interactive policies (privacy, terms, and
+ * future statements). Interactive documents (the grievance mechanism, whose
+ * page issues a signed form token and handles its own POST) are rendered by
+ * their own on-demand route under this directory and are excluded here so
+ * the two never race for the same path.
+ */
+export async function getStaticPaths() {
+  const entries = (await getCollection('policies')).filter(
+    (p) => !p.data.draft && !p.data.interactive,
+  );
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+---
+
+<Policy entry={entry}>
+  <Content />
+</Policy>

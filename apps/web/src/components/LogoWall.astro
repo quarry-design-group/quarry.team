@@ -1,0 +1,171 @@
+---
+/**
+ * LogoWall — auto-scrolling marquee of real brand logos. Uses <img> (not CSS
+ * mask) so each logo keeps its true artwork and internal detail, then applies a
+ * unified, theme-aware monochrome treatment via filter. Two identical tracks let
+ * the marquee loop seamlessly (translateX -50%).
+ *
+ * Motion accessibility (both WCAG Level A):
+ *  - Pausing is driven by the inherited --lw-play custom property (running |
+ *    paused). A page places a <MarqueePause> control on the surrounding
+ *    heading/intro row and toggles --lw-play with zero JS (see the
+ *    [data-marquee-scope] rule in global.css). Keeping the control out of this
+ *    component lets each page own its placement and never steals the carousel's
+ *    own width. Satisfies 2.2.2 Pause, Stop, Hide.
+ *  - Under prefers-reduced-motion the marquee stops and the logos reflow into a
+ *    static wrapped grid — no scroll region — so it never becomes an
+ *    unfocusable scrollable region (2.1.1; the repo's own axe e2e gate).
+ */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import type { Logo } from '@/lib/site';
+import { styleScope } from '@/lib/style-scope';
+
+interface Props {
+  items: Logo[];
+  /** Logo height in px. */
+  size?: number;
+  /** Seconds for one full loop (lower = faster). */
+  speed?: number;
+  class?: string;
+}
+const { items, size = 30, speed = 50, class: cls } = Astro.props;
+
+/** Build-time intrinsic aspect ratio of a public/ SVG, so every <img> can
+ *  carry truthful width+height attributes (Lighthouse unsized-images; the
+ *  browser reserves correct space before the file loads). CSS still owns the
+ *  rendered size. */
+const intrinsicRatio = (src: string): number => {
+  try {
+    const svg = readFileSync(fileURLToPath(new URL(`../../public${src}`, import.meta.url)), 'utf8');
+    const tag = svg.match(/<svg\b[^>]*>/)?.[0] ?? '';
+    const w = tag.match(/\swidth="([\d.]+)"/)?.[1];
+    const h = tag.match(/\sheight="([\d.]+)"/)?.[1];
+    if (w && h) return Number(w) / Number(h);
+    const vb = tag.match(/viewBox="[-\d.]+[ ,]+[-\d.]+[ ,]+([\d.]+)[ ,]+([\d.]+)"/);
+    if (vb) return Number(vb[1]) / Number(vb[2]);
+  } catch {
+    /* fall through to a generic wordmark ratio */
+  }
+  return 2;
+};
+const widthOf = new Map(
+  items.map((l) => [l.src, Math.max(1, Math.round(size * intrinsicRatio(l.src)))]),
+);
+
+/* Uniform cap-height for every logo; width follows its (build-time trimmed)
+   ratio. Per-logo --logo-scale gives compact/square marks a gentle optical
+   boost so they don't read smaller than the wordmarks. max-w reins in the
+   very widest wordmarks. Mono treatment: grayscale at 62%, lifting on hover
+   of the whole wall (dark-mode inversion stays in the residual CSS). */
+const imgCls =
+  'h-[calc(var(--logo-h)*var(--logo-scale,1))] w-auto max-w-[200px] object-contain grayscale opacity-[0.62] transition-opacity duration-250 ease-out group-hover/logowall:opacity-85';
+
+// Wall geometry + per-logo optical corrections ride a generated style block
+// (the strict CSP forbids style attributes — ADR-0015). One nth-child rule per
+// scaled logo; the selector matches both marquee copies.
+const sid = styleScope('lw', JSON.stringify([size, speed, items.map((l) => [l.src, l.scale])]));
+const varCss =
+  `.${sid}{--logo-h:${size}px;--speed:${speed}s}` +
+  items
+    .map((l, i) =>
+      l.scale ? `.${sid} .track>li:nth-child(${i + 1}) img{--logo-scale:${l.scale}}` : '',
+    )
+    .join('');
+---
+
+<div class:list={['logowall group/logowall overflow-hidden', sid, cls]}>
+  <div class="marquee flex w-max">
+    <ul class="track m-0 flex list-none items-center gap-16 ps-0 pe-16" role="list">
+      {items.map((l) => (
+        <li class="flex flex-none items-center">
+          <img
+            class={imgCls}
+            src={l.src}
+            alt={l.name}
+            width={widthOf.get(l.src)}
+            height={size}
+            loading="eager"
+            decoding="async"
+          />
+        </li>
+      ))}
+    </ul>
+    <ul class="track m-0 flex list-none items-center gap-16 ps-0 pe-16" aria-hidden="true">
+      {items.map((l) => (
+        <li class="flex flex-none items-center">
+          <img
+            class={imgCls}
+            src={l.src}
+            alt=""
+            width={widthOf.get(l.src)}
+            height={size}
+            loading="eager"
+            decoding="async"
+          />
+        </li>
+      ))}
+    </ul>
+  </div>
+</div>
+<style is:inline set:html={varCss}></style>
+
+<style>
+  /* Residual CSS: the marquee animation + --lw-play pause plumbing, the edge-
+     fade mask (removed under reduced motion), the theme-toggle-tracking dark
+     logo inversion, and the reduced-motion reflow into a static wrapped grid.
+     Plain layout/type moved to utilities on the markup. */
+  .logowall {
+    -webkit-mask: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+    mask: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  }
+  .marquee {
+    animation: logo-marquee var(--speed) linear infinite;
+    /* Pausing is external: a <MarqueePause> control sets --lw-play on an
+       ancestor and it inherits here (see global.css). */
+    animation-play-state: var(--lw-play, running);
+  }
+
+  /* Dark mode: invert so dark marks read as light on the dark page.
+     (Overrides the markup's `grayscale` utility — theme-toggle-tracking pair.) */
+  :global(:root[data-theme='dark']) .track img {
+    filter: grayscale(1) invert(1) brightness(1.4);
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .track img {
+      filter: grayscale(1) invert(1) brightness(1.4);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* No motion → no marquee. Reflow the single track into a centered wrapped
+       grid instead of a horizontal scroller, so nothing becomes an unfocusable
+       scrollable region (2.1.1 / axe scrollable-region-focusable). */
+    .logowall {
+      overflow: visible;
+      -webkit-mask: none;
+      mask: none;
+    }
+    .marquee {
+      width: auto;
+      animation: none;
+    }
+    .track {
+      flex-wrap: wrap;
+      justify-content: center;
+      row-gap: var(--space-4);
+      /* The scroller's trailing loop-spacer would offset the centered grid to
+         the left; drop it so the wrapped rows are truly centered. */
+      padding-inline: 0;
+    }
+    .marquee .track[aria-hidden='true'] {
+      display: none;
+    }
+  }
+
+  @keyframes logo-marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+</style>

@@ -1,0 +1,76 @@
+---
+/**
+ * Policy — the document shell for the /policies class (legal terms, privacy,
+ * the grievance mechanism, and what follows). One layout so every governance
+ * document reads the same way: category eyebrow with a route back to the
+ * index, title, the accountable role, a "last updated" stamp, and a prose
+ * body. The pages themselves supply the body (rendered MDX) and, for
+ * interactive documents, whatever follows it. See ADR-0016.
+ */
+import Base from '@/layouts/Base.astro';
+import Prose from '@/components/Prose.astro';
+import { site } from '@/lib/site';
+import { categoryLabels } from '@/lib/policies';
+import type { CollectionEntry } from 'astro:content';
+import { formatDate } from '@/lib/dates';
+
+interface Props {
+  entry: CollectionEntry<'policies'>;
+  /** Keep the page out of search indexes (confirmation screens, drafts). */
+  noindex?: boolean;
+}
+const { entry, noindex = false } = Astro.props;
+const { data } = entry;
+const pageUrl = `${site.url}/policies/${entry.id}`;
+
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: site.url },
+    { '@type': 'ListItem', position: 2, name: 'Policies', item: `${site.url}/policies` },
+    { '@type': 'ListItem', position: 3, name: data.title, item: pageUrl },
+  ],
+};
+---
+
+<Base
+  title={data.title}
+  description={data.summary}
+  noindex={noindex}
+  modifiedTime={data.updated.toISOString()}
+  jsonLd={[breadcrumbLd]}
+>
+  <article class="section">
+    <div class="container max-w-(--measure)">
+      <p class="eyebrow">
+        <a class="text-inherit underline underline-offset-2" href="/policies">
+          Policies
+        </a>{' '}
+        / {categoryLabels[data.category]}
+      </p>
+      <h1 class="mt-3 text-4xl">{data.title}</h1>
+      <dl class="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm text-(--color-text-muted)">
+        <div class="flex gap-2">
+          <dt>Last updated</dt>
+          <dd class="m-0 font-semibold text-(--color-text)">
+            <time datetime={data.updated.toISOString().slice(0, 10)}>
+              {formatDate(data.updated)}
+            </time>
+          </dd>
+        </div>
+        {data.owner && (
+          <div class="flex gap-2">
+            <dt>Owned by</dt>
+            <dd class="m-0 font-semibold text-(--color-text)">{data.owner}</dd>
+          </div>
+        )}
+      </dl>
+
+      <Prose class="mt-8 text-lg">
+        <slot />
+      </Prose>
+    </div>
+    <slot name="after" />
+  </article>
+</Base>

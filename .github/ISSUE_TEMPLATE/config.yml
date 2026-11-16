@@ -1,0 +1,10 @@
+# Route issues deliberately: vulnerabilities must never land in the public
+# tracker (SECURITY.md), and free-form questions belong on the contact page.
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/quarry-design-group/quarry.team/blob/main/SECURITY.md
+    about: Do NOT open a public issue for vulnerabilities — follow the disclosure process (security@quarry.team).
+  - name: Questions & inquiries
+    url: https://quarry.team/contact
+    about: Questions about Quarry, the site, or working with us.

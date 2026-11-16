@@ -1,0 +1,54 @@
+[
+  {
+    "id": "strategy-design",
+    "title": "Product Ownership & Design",
+    "discipline": "strategy",
+    "order": 1,
+    "summary": "Ground-up, template-free product ownership and humane UX/UI — from concept and prototyping to launch and iteration.",
+    "capabilities": [
+      "Product ownership & discovery",
+      "UX research & UI design",
+      "Design systems",
+      "Prototyping & validation"
+    ]
+  },
+  {
+    "id": "engineering",
+    "title": "Full-Stack Engineering",
+    "discipline": "engineering",
+    "order": 2,
+    "summary": "Scalable, high-performance web and mobile applications built for reliability, speed, and longevity.",
+    "capabilities": [
+      "Web & mobile apps",
+      "API & platform engineering",
+      "DevOps & infrastructure",
+      "Performance & reliability"
+    ]
+  },
+  {
+    "id": "ecommerce",
+    "title": "eCommerce Engineering",
+    "discipline": "ecommerce",
+    "order": 3,
+    "summary": "Revenue-moving commerce on Shopify, Magento, and BigCommerce — optimized for high-volume traffic and growth.",
+    "capabilities": [
+      "Storefront engineering",
+      "Conversion optimization",
+      "Incident response",
+      "Integrations & checkout"
+    ]
+  },
+  {
+    "id": "data",
+    "title": "Data & Modernization",
+    "discipline": "data",
+    "order": 4,
+    "summary": "Privacy-first, first-party data collection and legacy modernization: resilient measurement and clean platforms built to last.",
+    "capabilities": [
+      "Data platforms & BI",
+      "Privacy-compliant architecture",
+      "Legacy modernization",
+      "Platform integration"
+    ]
+  }
+]

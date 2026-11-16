@@ -1,0 +1,270 @@
+---
+import Logo from '@/components/Logo.astro';
+import Button from '@/components/Button.astro';
+import ThemeToggle from '@/components/ThemeToggle.astro';
+import { nav, primaryCta } from '@/lib/site';
+
+const path = Astro.url.pathname;
+const isActive = (href: string) => path === href || (href !== '/' && path.startsWith(href));
+const subId = (label: string) => `nav-sub-${label.toLowerCase().replace(/\W+/g, '-')}`;
+---
+
+<header class="site-header sticky top-0 z-50 border-b border-(--color-border) bg-[color-mix(in_oklab,var(--color-bg)_88%,transparent)] backdrop-blur-[8px] backdrop-saturate-[1.4]">
+  {/* Grouping the AI pages under one short trigger keeps seven top-level items; the bar
+      fits comfortably from ~860px, with a squeeze band below 1080px (tighter gaps via
+      min-[57.5625rem]:max-[67.5rem]:gap-4) before the hamburger takes over at 920px. */}
+  <div class="container bar flex h-(--header-height) items-center gap-6 min-[57.5625rem]:max-[67.5rem]:gap-4">
+    <a class="inline-flex text-(--color-text)" href="/" aria-label="Quarry home">
+      {/* Logo renders in its own component scope; the class prop lands on the <svg>.
+          Color is inherited (currentColor) from the anchor, so it tracks the theme. */}
+      <Logo class="block h-[22px] w-auto" />
+    </a>
+
+    <nav class="nav ms-auto max-[57.5rem]:hidden" aria-label="Primary">
+      {/* Top-level row only — the dropdown's nested <ul> gets its own layout classes.
+          Baseline alignment lines the group trigger's text up with the link text: the
+          <button> is an atomic inline box whose padding adds height, so stretch/center
+          alignment sat it visibly lower than the links. */}
+      <ul
+        role="list"
+        class="m-0 flex list-none items-baseline gap-6 p-0 min-[57.5625rem]:max-[67.5rem]:gap-4"
+      >
+        {nav.map((item) =>
+          'children' in item ? (
+            <li class="has-sub relative">
+              <button
+                type="button"
+                class="sub-btn group inline-flex cursor-pointer items-center gap-[6px] border-b-2 border-transparent bg-transparent py-2 text-base font-medium text-(--color-text) transition-[border-color] duration-150 ease-out hover:border-(--color-primary) aria-expanded:border-(--color-primary) data-[current]:border-(--color-primary)"
+                aria-expanded="false"
+                aria-controls={subId(item.label)}
+                data-current={item.children.some((c) => isActive(c.href)) ? 'true' : undefined}
+              >
+                {item.label}
+                <svg
+                  class="transition-[rotate] duration-150 ease-out group-aria-expanded:rotate-180"
+                  width="10"
+                  height="6"
+                  viewBox="0 0 10 6"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M1 1l4 4 4-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+              {/* Dropdown panel: a solid surface (the header itself is translucent)
+                    anchored to the item. */}
+              <ul
+                role="list"
+                class="sub absolute top-[calc(100%+8px)] left-0 z-60 m-0 grid min-w-52 list-none gap-[2px] rounded-md border border-(--color-border) bg-(--color-bg) p-2 shadow-md min-[57.5625rem]:max-[67.5rem]:gap-4"
+                id={subId(item.label)}
+                hidden
+              >
+                {item.children.map((c) => (
+                  <li>
+                    <a
+                      class="block rounded-sm px-3 py-2 text-base font-medium whitespace-nowrap text-(--color-text) hover:bg-(--color-surface) hover:text-(--color-primary) aria-[current=page]:bg-(--color-surface) aria-[current=page]:text-(--color-primary)"
+                      href={c.href}
+                      aria-current={isActive(c.href) ? 'page' : undefined}
+                    >
+                      {c.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ) : (
+            <li>
+              <a
+                class="border-b-2 border-transparent py-2 text-base font-medium text-(--color-text) transition-[border-color] duration-150 ease-out hover:border-(--color-primary) aria-[current=page]:border-(--color-primary)"
+                href={item.href}
+                aria-current={isActive(item.href) ? 'page' : undefined}
+              >
+                {item.label}
+              </a>
+            </li>
+          ),
+        )}
+      </ul>
+    </nav>
+
+    <div class="flex items-center gap-3 max-[57.5rem]:hidden">
+      <a
+        class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-(--color-border) text-(--color-text) transition-colors duration-150 ease-out hover:border-(--color-border-strong) hover:bg-(--color-surface-2) aria-[current=page]:border-(--color-text)"
+        href="/search"
+        aria-label="Search"
+        title="Search"
+        aria-current={isActive('/search') ? 'page' : undefined}
+        data-astro-prefetch="false"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="20"
+          height="20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.5-3.5"></path>
+        </svg>
+      </a>
+      <ThemeToggle />
+      <Button href={primaryCta.href} size="md">
+        {primaryCta.label}
+      </Button>
+    </div>
+
+    <button
+      class="menu-toggle ms-auto hidden cursor-pointer flex-col gap-[5px] bg-transparent p-2 max-[57.5rem]:flex"
+      type="button"
+      aria-expanded="false"
+      aria-controls="mobile-nav"
+      aria-label="Open menu"
+    >
+      <span class="h-0.5 w-6 bg-(--color-text)"></span>
+      <span class="h-0.5 w-6 bg-(--color-text)"></span>
+      <span class="h-0.5 w-6 bg-(--color-text)"></span>
+    </button>
+  </div>
+
+  <div
+    class="max-h-[calc(100dvh-var(--header-height))] overflow-y-auto overscroll-contain border-t border-(--color-border) px-6 pt-4 pb-8 min-[57.5625rem]:hidden"
+    id="mobile-nav"
+    hidden
+  >
+    <nav aria-label="Mobile navigation">
+      <ul role="list" class="m-0 grid list-none gap-2 p-0">
+        {nav.map((item) =>
+          'children' in item ? (
+            /* Mobile menu: a nav group renders as a labeled section, children indented. */
+            <li>
+              <span class="mt-2 block py-1 font-mono text-sm tracking-[0.08em] text-(--color-text-muted) uppercase">
+                {item.label}
+              </span>
+              <ul role="list" class="m-0 grid list-none gap-2 pl-4">
+                {item.children.map((c) => (
+                  <li>
+                    <a class="block py-3 text-lg text-(--color-text)" href={c.href}>
+                      {c.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ) : (
+            <li>
+              <a class="block py-3 text-lg text-(--color-text)" href={item.href}>
+                {item.label}
+              </a>
+            </li>
+          ),
+        )}
+        <li>
+          <a
+            class="flex items-center gap-3 py-3 text-lg text-(--color-text)"
+            href="/search"
+            data-astro-prefetch="false"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m20 20-3.5-3.5"></path>
+            </svg>
+            Search
+          </a>
+        </li>
+        <li>
+          <a class="block py-3 text-lg font-semibold text-(--color-primary)" href={primaryCta.href}>
+            {primaryCta.label}
+          </a>
+        </li>
+        <li class="mt-3 flex items-center justify-between border-t border-(--color-border) pt-3">
+          <span class="text-lg">Theme</span>
+          <ThemeToggle />
+        </li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<script is:inline>
+  (() => {
+    const btn = document.querySelector('.menu-toggle');
+    const panel = document.getElementById('mobile-nav');
+    if (!btn || !panel) return;
+    const close = () => {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('aria-label', 'Open menu');
+      panel.hidden = true;
+      document.documentElement.style.removeProperty('overflow');
+    };
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      if (open) return close();
+      btn.setAttribute('aria-expanded', 'true');
+      btn.setAttribute('aria-label', 'Close menu');
+      panel.hidden = false;
+      document.documentElement.style.overflow = 'hidden';
+      panel.querySelector('a')?.focus();
+    });
+    panel.addEventListener('click', (e) => {
+      if (e.target instanceof HTMLAnchorElement) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') {
+        close();
+        btn.focus();
+      }
+    });
+  })();
+
+  /* Desktop nav groups — APG disclosure-navigation pattern: click toggles,
+     Escape closes and restores focus, leaving (focusout / outside click)
+     closes. No hover-open: one consistent behavior for pointer + keyboard. */
+  (() => {
+    document.querySelectorAll('.nav .has-sub').forEach((li) => {
+      const btn = li.querySelector('.sub-btn');
+      const sub = li.querySelector('.sub');
+      if (!btn || !sub) return;
+      const set = (open) => {
+        btn.setAttribute('aria-expanded', String(open));
+        sub.hidden = !open;
+      };
+      btn.addEventListener('click', () => set(btn.getAttribute('aria-expanded') !== 'true'));
+      li.addEventListener('focusout', (e) => {
+        if (!(e.relatedTarget instanceof Node && li.contains(e.relatedTarget))) set(false);
+      });
+      li.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') {
+          set(false);
+          btn.focus();
+        }
+      });
+      document.addEventListener('click', (e) => {
+        if (
+          btn.getAttribute('aria-expanded') === 'true' &&
+          !(e.target instanceof Node && li.contains(e.target))
+        )
+          set(false);
+      });
+    });
+  })();
+</script>

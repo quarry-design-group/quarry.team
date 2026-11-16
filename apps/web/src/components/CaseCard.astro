@@ -1,0 +1,122 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import type { ImageMetadata } from 'astro';
+import { Image } from 'astro:assets';
+import Tag from '@/components/Tag.astro';
+import { monogram } from '@/lib/monogram';
+
+interface Props {
+  entry: CollectionEntry<'cases'>;
+  /**
+   * Mark this card's hero as the LCP image: eager and fetchpriority="high".
+   * Set on the first card of a grid; every other card lazy-loads.
+   */
+  priority?: boolean;
+}
+const { entry, priority = false } = Astro.props;
+const { data } = entry;
+
+// Stat-led cards keep the numeral anatomy; outcome-led cards carry the kicker
+// (or the headline's first clause) in the SAME slot weight — display face,
+// accent ink, same size — so the proof slot reads consistently across the
+// grid whether the lead is a number or a word.
+const { outcome } = data;
+const kickerText = outcome.kicker ?? `${outcome.headline.split(/[.;:,—–]/)[0].trim()}.`;
+
+// Client identity avatar: brand-mark favicon where we have one, the disguise
+// emoji for confidential clients, otherwise a monogram. Favicons render full
+// color on a light chip so they read in both themes.
+import bostonScientificAvatar from '@/assets/logos/client-avatars/boston-scientific.png';
+import qualcommAvatar from '@/assets/logos/client-avatars/qualcomm.png';
+import wmAvatar from '@/assets/logos/client-avatars/wm.png';
+import harvestHostsAvatar from '@/assets/logos/client-avatars/harvest-hosts.png';
+import sharkTankAvatar from '@/assets/logos/client-avatars/shark-tank.png';
+const CLIENT_LOGOS: Record<string, ImageMetadata> = {
+  'Boston Scientific': bostonScientificAvatar,
+  Qualcomm: qualcommAvatar,
+  'WM (Waste Management)': wmAvatar,
+  WM: wmAvatar,
+  'Harvest Hosts': harvestHostsAvatar,
+  'Joe’s Gourmet (Shark Tank)': sharkTankAvatar,
+};
+const isConfidential = /confidential/i.test(data.client);
+const clientLogo = CLIENT_LOGOS[data.client];
+const initials = monogram(data.client);
+
+// `card` on the root anchor is an identity hook (pinned by e2e locators) —
+// all styling lives in the Tailwind utilities alongside it.
+---
+
+<a
+  class="card flex h-full flex-col overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) text-inherit no-underline transition-[transform,border-color] duration-250 ease-out hover:-translate-y-[3px] hover:border-(--color-border-strong)"
+  href={`/work/${entry.id}`}
+>
+  <div class="relative aspect-[16/10] overflow-clip bg-(--color-surface-2)">
+    {data.hero ? (
+      <Image
+        class="absolute inset-0 block size-full object-cover"
+        src={data.hero}
+        alt={data.heroAlt}
+        widths={[400, 800]}
+        sizes="(min-width:700px) 50vw, 100vw"
+        loading={priority ? 'eager' : 'lazy'}
+        fetchpriority={priority ? 'high' : undefined}
+      />
+    ) : (
+      <div
+        class="absolute inset-0 bg-[linear-gradient(135deg,var(--color-surface-2),var(--color-surface))]"
+        aria-hidden="true"
+      />
+    )}
+  </div>
+  <div class="flex flex-1 flex-col p-6">
+    <div class="flex flex-wrap gap-2">
+      {data.disciplines.slice(0, 3).map((d) => (
+        <Tag discipline={d} />
+      ))}
+    </div>
+    {outcome.stat ? (
+      <p class="mt-3 truncate text-sm text-(--color-text-muted)">
+        <strong class="font-display text-lg text-(--color-accent-ink,--color-accent)">
+          {outcome.stat.value}
+        </strong>{' '}
+        {outcome.stat.label}
+      </p>
+    ) : (
+      <p class="mt-3 truncate text-sm text-(--color-text-muted)">
+        <strong class="font-display text-lg text-(--color-accent-ink,--color-accent)">
+          {kickerText}
+        </strong>
+      </p>
+    )}
+    <h2 class="mt-2 line-clamp-3 text-2xl">{data.title}</h2>
+    <div class="mt-auto flex items-center gap-3 pt-4 text-sm text-(--color-text-muted)">
+      {clientLogo ? (
+        <Image
+          class="inline-flex size-7 flex-none items-center justify-center overflow-hidden rounded-full border border-(--color-border) bg-stone-0 object-contain p-[3px]"
+          src={clientLogo}
+          alt=""
+          width={24}
+          height={24}
+          densities={[1, 2]}
+          loading="lazy"
+        />
+      ) : isConfidential ? (
+        <span
+          class="inline-flex size-7 flex-none items-center justify-center overflow-hidden rounded-full border border-(--color-border) bg-(--color-surface-2) text-[15px] filter-none"
+          aria-hidden="true"
+        >
+          🥸
+        </span>
+      ) : (
+        <span
+          class="inline-flex size-7 flex-none items-center justify-center overflow-hidden rounded-full border border-(--color-border) bg-(--color-surface-2) font-mono text-xs text-(--color-text)"
+          aria-hidden="true"
+        >
+          {initials}
+        </span>
+      )}
+      <span>{data.client}</span>
+    </div>
+  </div>
+</a>

@@ -1,0 +1,29 @@
+# environments/production.tfvars.example
+#
+# Copy to production.tfvars and fill in real, NON-SECRET values. Secrets are
+# supplied via TF_VAR_* env vars in CI, NOT in this file. production.tfvars is
+# gitignored.
+#
+#   cp environments/production.tfvars.example environments/production.tfvars
+#   terraform plan -var-file=environments/production.tfvars
+
+# ── Identity ─────────────────────────────────────────────────────────────────
+cloudflare_account_id = "0123456789abcdef0123456789abcdef" # your CF account id
+domain                = "quarry.team"
+
+# ── Worker / web ─────────────────────────────────────────────────────────────
+# Must match `name` in apps/web/wrangler.toml. The Worker (static site + the
+# same-origin /api/* form routes) is deployed by `wrangler deploy`, not Terraform.
+worker_name = "quarry-web"
+
+# ── D1 (form-submission store) ───────────────────────────────────────────────
+# Must match the [[d1_databases]] binding in apps/web/wrangler.toml (the
+# staging database is created as "<name>-staging"). After the first apply,
+# copy `terraform output -raw d1_database_id` (and d1_staging_database_id)
+# into wrangler.toml.
+d1_database_name    = "marketing-site-form-submissions"
+d1_read_replication = false
+
+# ── R2 storage ───────────────────────────────────────────────────────────────
+state_bucket_name = "quarry-tf-state"
+r2_location_hint  = "enam"

@@ -1,0 +1,353 @@
+---
+import { getCollection } from 'astro:content';
+import { Image, getImage } from 'astro:assets';
+import Base from '@/layouts/Base.astro';
+import CtaBand from '@/components/CtaBand.astro';
+import LogoWall from '@/components/LogoWall.astro';
+import MarqueePause from '@/components/MarqueePause.astro';
+import Globe from '@/components/Globe.astro';
+import TeamVoices from '@/components/TeamVoices.astro';
+import { heritageLogos, site, staffVoices } from '@/lib/site';
+import { monogram } from '@/lib/monogram';
+const team = (await getCollection('team')).sort((a, b) => a.data.order - b.data.order);
+const markers = team
+  .filter((m) => typeof m.data.lat === 'number' && typeof m.data.lng === 'number')
+  .map((m) => [m.data.lat as number, m.data.lng as number] as [number, number]);
+
+// Roster as Person structured data — real fields only (no fabricated
+// alumniOf/sameAs). Photos go through getImage (not raw `avatar.src`: the
+// untransformed original is never emitted to dist, so its URL would 404).
+// 144×144 matches the roster <Image>'s 2x variant, so no extra files ship.
+const personImages = await Promise.all(
+  team.map((m) =>
+    m.data.avatar ? getImage({ src: m.data.avatar, width: 144, height: 144 }) : undefined,
+  ),
+);
+const teamLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'Quarry team',
+  itemListElement: team.map((m, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    item: {
+      '@type': 'Person',
+      name: m.data.name,
+      jobTitle: m.data.role,
+      worksFor: { '@id': `${site.url}/#org` },
+      ...(personImages[i] ? { image: new URL(personImages[i].src, site.url).href } : {}),
+      ...(m.data.location ? { workLocation: { '@type': 'Place', name: m.data.location } } : {}),
+    },
+  })),
+};
+
+// Brighter, individually-twinkling stars. Split into two depth layers:
+//  - "back" sits BEHIND the globe (the sphere occludes any that fall on its face)
+//  - "front" sits in the open sky to the LEFT of the globe, above the scrim.
+// [x%, y%, size(px), duration(s), delay(s)]
+const twinklesBack: [number, number, number, number, number][] = [
+  [57, 9, 2.6, 3.1, 0],
+  [71, 16, 2.0, 4.2, 0.8],
+  [83, 6, 3.0, 3.7, 1.6],
+  [92, 22, 2.2, 2.6, 0.4],
+  [64, 33, 1.8, 5.0, 2.1],
+  [88, 38, 2.6, 3.4, 1.1],
+  [76, 48, 2.0, 4.6, 0.3],
+  [95, 52, 2.4, 2.9, 1.9],
+  [60, 58, 2.2, 3.8, 0.6],
+  [84, 66, 3.0, 4.4, 2.4],
+  [70, 74, 2.0, 3.2, 1.3],
+  [90, 82, 2.6, 5.1, 0.9],
+];
+// NB: y is a % of the (tall) hero+roster container, so keep these small to land
+// in the hero's open left column rather than down in the roster grid.
+const twinklesFront: [number, number, number, number, number][] = [
+  [6, 9, 2.4, 3.6, 0.5],
+  [15, 6, 2.0, 4.8, 1.7],
+  [4, 18, 2.6, 3.3, 0.2],
+  [22, 12, 1.8, 5.2, 2.3],
+  [33, 8, 2.2, 3.9, 1.0],
+  [10, 27, 2.6, 4.3, 0.7],
+  [41, 15, 2.0, 2.8, 2.0],
+  [27, 24, 2.4, 4.0, 1.4],
+  [45, 22, 2.0, 3.5, 0.4],
+  [17, 33, 2.2, 3.2, 1.1],
+  [36, 30, 2.0, 4.5, 0.6],
+  [7, 36, 2.4, 3.0, 1.9],
+];
+
+// Each star's position/size/tempo rides a generated style block addressed by
+// nth-child — not per-element style attributes, which the strict hash-pinned
+// CSP forbids (ADR-0015). The layers are addressed via their starfield
+// siblings (`.starfield--back + .twinkles`), the classes the residual CSS
+// already keys on.
+const twinkleCss = (layer: string, stars: typeof twinklesBack) =>
+  stars
+    .map(
+      ([x, y, s, d, delay], i) =>
+        `.starfield--${layer}+.twinkles span:nth-child(${i + 1}){--x:${x}%;--y:${y}%;--s:${s}px;--d:${d}s;--delay:${delay}s}`,
+    )
+    .join('');
+const twinkleVarCss = twinkleCss('back', twinklesBack) + twinkleCss('front', twinklesFront);
+---
+
+<Base
+  title="Team: senior alumni of Google, Amazon & Microsoft"
+  description="A globally-distributed collective of senior product people — alumni of Microsoft, Google, Amazon, and Adobe — who do the work themselves. No handoffs."
+  jsonLd={[teamLd]}
+>
+  {/* The globe + starfield are a background spanning the hero AND the team grid,
+      pulled up under the sticky header (by --header-height) so the header's
+      glass reveals the globe. overflow-x-clip contains the off-canvas globe
+      while letting it flow downward.
+      Stacking (back → front): sky--back(0) · globe(1) · scrim(2) · sky--front(3) · copy(4) */}
+  <div class="team-top relative -mt-(--header-height) overflow-x-clip">
+    <style is:inline set:html={twinkleVarCss}></style>
+    {/* Stars BEHIND the globe — the sphere occludes any that fall on its face. */}
+    <div class="pointer-events-none absolute inset-0 z-0" aria-hidden="true">
+      <div class="starfield starfield--back absolute inset-0 bg-no-repeat"></div>
+      <div class="twinkles pointer-events-none absolute inset-0">
+        {twinklesBack.map(() => (
+          <span class="absolute top-(--y) left-(--x) size-(--s) rounded-full bg-stone-0 shadow-[0_0_4px_1px_color-mix(in_oklab,var(--stone-0)_75%,transparent),0_0_9px_2px_color-mix(in_oklab,var(--blue-100)_40%,transparent)]" />
+        ))}
+      </div>
+    </div>
+
+    {/* Reveal the globe on the right; fade it out toward the copy on the left. */}
+    <div
+      class="team-bg pointer-events-none absolute inset-0 z-1 [-webkit-mask:linear-gradient(to_left,#000_42%,transparent_82%)] [mask:linear-gradient(to_left,#000_42%,transparent_82%)]"
+      aria-hidden="true"
+    >
+      <Globe markers={markers} class="hero-globe" />
+    </div>
+
+    {/* Stars in front of the scrim, in the open sky to the LEFT of the globe. */}
+    <div class="pointer-events-none absolute inset-0 z-3" aria-hidden="true">
+      <div class="starfield starfield--front absolute inset-0 bg-no-repeat"></div>
+      <div class="twinkles pointer-events-none absolute inset-0">
+        {twinklesFront.map(() => (
+          <span class="absolute top-(--y) left-(--x) size-(--s) rounded-full bg-stone-0 shadow-[0_0_4px_1px_color-mix(in_oklab,var(--stone-0)_75%,transparent),0_0_9px_2px_color-mix(in_oklab,var(--blue-100)_40%,transparent)]" />
+        ))}
+      </div>
+    </div>
+
+    <section class="relative z-4 pt-[calc(var(--header-height)_+_clamp(2.5rem,1.5rem_+_5vw,6rem))] pb-[clamp(2rem,1rem_+_4vw,4rem)]">
+      <div class="container relative z-2">
+        <p class="eyebrow">The team</p>
+        <h1 class="mt-3 text-4xl">Senior. Global. Proven.</h1>
+        <p class="measure mt-4 text-lg text-(--color-text-muted)">
+          Quarry is a multi-disciplinary team with heritage at the organizations our clients admire.
+          We collaborate closely, and only, with teams we believe in.
+        </p>
+
+        <div class="mt-32 max-w-[44ch]">
+          <p class="eyebrow">Distributed by design</p>
+          <h2 class="mt-3 max-w-[16ch] text-3xl">One team, across every time zone.</h2>
+          <p class="mt-4 text-lg text-(--color-text-muted)">
+            The bench spans the Americas, Europe, Africa, and Asia: {team.length} individuals other
+            teams call when it has to ship. We follow the sun. Your roadmap moves while you sleep.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section relative z-4">
+      <div class="container">
+        <ul
+          role="list"
+          class="people m-0 mt-12 grid list-none grid-cols-1 gap-8 p-0 min-[43.75rem]:grid-cols-3"
+        >
+          {team.map((m) => {
+            const initials = monogram(m.data.name);
+            return (
+              <li class="person">
+                {m.data.avatar ? (
+                  <Image
+                    class="avatar size-[72px] rounded-full object-cover"
+                    src={m.data.avatar}
+                    alt={m.data.name}
+                    width={72}
+                    height={72}
+                    densities={[1, 2]}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <span
+                    class="inline-flex size-[72px] items-center justify-center rounded-full border border-(--color-border) bg-(--color-surface-2) font-display text-xl font-[480] text-(--color-text)"
+                    aria-hidden="true"
+                  >
+                    {initials}
+                  </span>
+                )}
+                <h2 class="mt-3 text-xl">{m.data.name}</h2>
+                <p class="mt-1 font-mono text-sm text-(--color-primary)">{m.data.role}</p>
+                {m.data.location && (
+                  <p class="mt-1 text-sm text-(--color-text-muted)">{m.data.location}</p>
+                )}
+                {m.data.bio && <p class="mt-2 text-sm text-(--color-text-muted)">{m.data.bio}</p>}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <TeamVoices items={staffVoices} />
+
+  <section class="section">
+    <div class="container">
+      <div class="mt-24" data-marquee-scope>
+        <div class="marquee-head">
+          <p class="eyebrow">Heritage — where our team has built</p>
+          <MarqueePause />
+        </div>
+        <LogoWall items={heritageLogos} class="mt-4" />
+      </div>
+    </div>
+  </section>
+
+  {/* CTA band trims .section's top padding, so it sets both sides itself. */}
+  <section class="pt-4 pb-(--space-section)">
+    <div class="container">
+      <CtaBand
+        title="Want to build with this team?"
+        sub="We hire continuously for exceptional senior people."
+        label="See open roles"
+        href="/careers"
+      />
+    </div>
+  </section>
+</Base>
+
+<style>
+  /* Residual CSS: the scrim + starfield gradient stacks (unreadable as
+     utilities), the theme-toggle-tracking dark reveals, the twinkle keyframes
+     with their reduced-motion gate, and the globe seat — its rule must beat
+     the Globe root's own position/size utilities, which a class prop can't do
+     reliably. Everything else moved to utilities on the markup. */
+
+  /* Readability scrim — page bg fading rightward (protect copy) and upward from
+     the bottom (so the globe dissolves organically into the team grid). */
+  .team-top::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background:
+      linear-gradient(
+        to right,
+        var(--color-bg) 34%,
+        color-mix(in oklab, var(--color-bg) 60%, transparent) 58%,
+        transparent 84%
+      ),
+      linear-gradient(to top, var(--color-bg) 20%, transparent 46%);
+  }
+  .team-bg :global(.hero-globe) {
+    position: absolute;
+    /* Art-direction nudge: seat the sphere tighter into the top-right corner.
+       min(12.5vw, 200px) = exactly 200px on desktop (>=1600px viewports, where
+       it was tuned) and scales with the viewport below that — a fixed 200px
+       would shove the vw-sized mobile globe almost entirely off-canvas. */
+    top: calc(-6vh - min(12.5vw, 200px));
+    right: calc(-30% - min(12.5vw, 200px));
+    /* ~15% larger than the original min(112vw, 1500px). */
+    width: min(129vw, 1725px);
+    max-width: none;
+    margin: 0;
+    aspect-ratio: 1;
+  }
+  /* Subtle scattered starfield — shown mainly in dark mode. */
+  .starfield {
+    opacity: 0;
+  }
+  .starfield--back {
+    /* raw-color: allow — white star stops with alpha: luminance only, no hue. */
+    background-image:
+      radial-gradient(2px 2px at 55% 12%, rgba(255, 255, 255, 1), transparent),
+      radial-gradient(1.4px 1.4px at 68% 22%, rgba(255, 255, 255, 0.85), transparent),
+      radial-gradient(1.8px 1.8px at 80% 8%, rgba(255, 255, 255, 0.95), transparent),
+      radial-gradient(1.4px 1.4px at 90% 30%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.8px 1.8px at 62% 45%, rgba(255, 255, 255, 0.9), transparent),
+      radial-gradient(1.3px 1.3px at 74% 55%, rgba(255, 255, 255, 0.75), transparent),
+      radial-gradient(2.2px 2.2px at 86% 60%, rgba(255, 255, 255, 1), transparent),
+      radial-gradient(1.4px 1.4px at 95% 70%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.8px 1.8px at 58% 78%, rgba(255, 255, 255, 0.9), transparent),
+      radial-gradient(1.3px 1.3px at 70% 88%, rgba(255, 255, 255, 0.7), transparent),
+      radial-gradient(2px 2px at 82% 84%, rgba(255, 255, 255, 0.95), transparent),
+      radial-gradient(1.4px 1.4px at 92% 92%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.6px 1.6px at 50% 30%, rgba(255, 255, 255, 0.85), transparent),
+      radial-gradient(1.3px 1.3px at 64% 15%, rgba(255, 255, 255, 0.7), transparent),
+      radial-gradient(1.8px 1.8px at 78% 38%, rgba(255, 255, 255, 0.9), transparent),
+      radial-gradient(1.3px 1.3px at 88% 48%, rgba(255, 255, 255, 0.75), transparent),
+      radial-gradient(2.1px 2.1px at 60% 65%, rgba(255, 255, 255, 0.95), transparent),
+      radial-gradient(1.3px 1.3px at 72% 72%, rgba(255, 255, 255, 0.7), transparent),
+      radial-gradient(1.8px 1.8px at 84% 20%, rgba(255, 255, 255, 0.9), transparent),
+      radial-gradient(1.4px 1.4px at 96% 14%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.6px 1.6px at 54% 52%, rgba(255, 255, 255, 0.85), transparent),
+      radial-gradient(1.8px 1.8px at 76% 95%, rgba(255, 255, 255, 0.9), transparent),
+      radial-gradient(1.3px 1.3px at 89% 78%, rgba(255, 255, 255, 0.75), transparent),
+      radial-gradient(1.5px 1.5px at 47% 18%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.4px 1.4px at 66% 62%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.7px 1.7px at 93% 40%, rgba(255, 255, 255, 0.85), transparent),
+      radial-gradient(1.3px 1.3px at 52% 70%, rgba(255, 255, 255, 0.7), transparent),
+      radial-gradient(1.6px 1.6px at 80% 50%, rgba(255, 255, 255, 0.85), transparent);
+  }
+  /* Front stars live in the hero's open left column — keep y small (see note in
+     the frontmatter): the container also spans the full roster below. */
+  .starfield--front {
+    /* raw-color: allow — white star stops with alpha: luminance only, no hue. */
+    background-image:
+      radial-gradient(1.8px 1.8px at 8% 7%, rgba(255, 255, 255, 0.9), transparent),
+      radial-gradient(1.3px 1.3px at 18% 13%, rgba(255, 255, 255, 0.75), transparent),
+      radial-gradient(2px 2px at 5% 20%, rgba(255, 255, 255, 0.95), transparent),
+      radial-gradient(1.4px 1.4px at 26% 9%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.7px 1.7px at 14% 26%, rgba(255, 255, 255, 0.85), transparent),
+      radial-gradient(1.3px 1.3px at 33% 17%, rgba(255, 255, 255, 0.7), transparent),
+      radial-gradient(2px 2px at 22% 31%, rgba(255, 255, 255, 0.9), transparent),
+      radial-gradient(1.4px 1.4px at 40% 11%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.6px 1.6px at 10% 33%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.3px 1.3px at 44% 28%, rgba(255, 255, 255, 0.7), transparent),
+      radial-gradient(1.8px 1.8px at 30% 35%, rgba(255, 255, 255, 0.85), transparent),
+      radial-gradient(1.3px 1.3px at 47% 19%, rgba(255, 255, 255, 0.7), transparent),
+      radial-gradient(1.5px 1.5px at 3% 30%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1.4px 1.4px at 38% 24%, rgba(255, 255, 255, 0.75), transparent);
+  }
+  :global(:root[data-theme='dark']) .starfield {
+    opacity: 1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .starfield {
+      opacity: 1;
+    }
+  }
+  /* Brighter, individually-twinkling stars layered over the static field. */
+  .twinkles {
+    opacity: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .twinkles span {
+      animation: twinkle var(--d) ease-in-out var(--delay) infinite alternate;
+    }
+  }
+  @keyframes twinkle {
+    from {
+      opacity: 0.2;
+      transform: scale(0.6);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  :global(:root[data-theme='dark']) .twinkles {
+    opacity: 1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .twinkles {
+      opacity: 1;
+    }
+  }
+</style>

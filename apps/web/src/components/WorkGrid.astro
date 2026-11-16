@@ -1,0 +1,70 @@
+---
+/**
+ * WorkGrid — the case library: a zero-JS discipline filter bar, a visible
+ * count, and the card grid. `/work` and every `/work/discipline/<d>` view
+ * render this one component, so publication, ordering and the filter set are
+ * defined once (src/lib/work.ts). `active` names the discipline a view is
+ * scoped to; without it the grid lists every published case. The first card
+ * is the page's LCP element and renders eagerly (CaseCard `priority`); the
+ * pages preload its hero from the same ordering.
+ */
+import { getCollection } from 'astro:content';
+import CaseCard from '@/components/CaseCard.astro';
+import {
+  byCaseOrder,
+  disciplineHref,
+  disciplineLabels,
+  disciplineOrder,
+  isPublished,
+  type Discipline,
+} from '@/lib/work';
+
+interface Props {
+  active?: Discipline;
+}
+const { active } = Astro.props;
+
+const all = (await getCollection('cases')).filter(isPublished).sort(byCaseOrder);
+// Filters exist only for disciplines with at least one published case, in the
+// same set the discipline views prerender.
+const filters = disciplineOrder
+  .map((d) => ({ d, count: all.filter((c) => c.data.disciplines.includes(d)).length }))
+  .filter((f) => f.count > 0);
+const cases = active ? all.filter((c) => c.data.disciplines.includes(active)) : all;
+const noun = cases.length === 1 ? 'case study' : 'case studies';
+const count = `${cases.length} ${noun}${active ? ` in ${disciplineLabels[active]}` : ''}`;
+
+const chip =
+  'inline-flex items-center gap-2 rounded-full border border-(--color-border) px-4 py-2 text-sm font-medium text-(--color-text) no-underline transition-[border-color,background-color,color] duration-150 ease-out hover:border-(--color-border-strong) aria-[current=page]:border-(--color-text) aria-[current=page]:bg-(--color-text) aria-[current=page]:text-(--color-bg)';
+---
+
+<nav class="mt-10" aria-label="Filter work by discipline">
+  <ul class="m-0 flex list-none flex-wrap gap-2 p-0" role="list">
+    <li>
+      <a class={chip} href="/work" aria-current={active ? undefined : 'page'}>
+        All work <span class="font-mono text-xs">{all.length}</span>
+      </a>
+    </li>
+    {filters.map(({ d, count }) => (
+      <li>
+        <a class={chip} href={disciplineHref(d)} aria-current={active === d ? 'page' : undefined}>
+          {disciplineLabels[d]} <span class="font-mono text-xs">{count}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<p class="mt-8 font-mono text-sm tracking-[0.06em] text-(--color-text-muted) uppercase">{count}</p>
+
+{cases.length > 0 ? (
+  <ul class="m-0 mt-6 grid list-none grid-cols-1 gap-6 p-0 min-[43.75rem]:grid-cols-2" role="list">
+    {cases.map((c, i) => (
+      <li>
+        <CaseCard entry={c} priority={i === 0} />
+      </li>
+    ))}
+  </ul>
+) : (
+  <p class="mt-6 text-(--color-text-muted)">Case studies are being migrated. Check back shortly.</p>
+)}

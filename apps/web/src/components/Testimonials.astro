@@ -1,0 +1,58 @@
+---
+/** Testimonials — a grid of client quotes with reviewer photos + attribution. */
+import { Image } from 'astro:assets';
+import type { Testimonial } from '@/lib/site';
+import { monogram } from '@/lib/monogram';
+interface Props {
+  items: Testimonial[];
+  class?: string;
+}
+const { items, class: cls } = Astro.props;
+---
+
+{/* `testimonials`, `card`, and `avatar` stay as identity hooks for e2e tests. */}
+<ul
+  class:list={[
+    'testimonials',
+    'm-0 grid list-none grid-cols-1 gap-4 p-0 min-[45rem]:grid-cols-2',
+    cls,
+  ]}
+  role="list"
+>
+  {items.map((t) => (
+    <li class="card rounded-lg border bg-(--color-surface) border-(--color-border) p-8">
+      <figure class="m-0 flex h-full flex-col gap-6">
+        <blockquote class="m-0 font-display text-lg font-normal leading-[1.4] tracking-[-0.01em] text-pretty text-(--color-text)">
+          “{t.quote}”
+        </blockquote>
+        <figcaption class="mt-auto flex items-center gap-3">
+          {t.avatar ? (
+            <Image
+              class="avatar h-12 w-12 flex-none rounded-full border border-(--color-border) object-cover"
+              src={t.avatar}
+              alt={t.author}
+              width={48}
+              height={48}
+              densities={[1, 2]}
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <span
+              class="avatar inline-flex h-12 w-12 flex-none items-center justify-center rounded-full border bg-(--color-surface-2) border-(--color-border) font-mono text-sm tracking-[0.02em] text-(--color-text-muted)"
+              aria-hidden="true"
+            >
+              {monogram(t.author, { preferCapitals: true })}
+            </span>
+          )}
+          <span class="flex flex-col gap-px">
+            <span class="font-text font-semibold text-(--color-text)">{t.author}</span>
+            <span class="font-mono text-xs tracking-[0.02em] text-(--color-text-muted)">
+              {[t.role, t.company].filter(Boolean).join(', ')}
+            </span>
+          </span>
+        </figcaption>
+      </figure>
+    </li>
+  ))}
+</ul>

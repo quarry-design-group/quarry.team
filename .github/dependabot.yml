@@ -1,0 +1,104 @@
+# Dependency update policy — see ADR-0018 (docs/adr/0018-dependency-update-policy.md)
+# and ADR-0020 (docs/adr/0020-platform-updates-move-as-one-reviewed-unit.md).
+#
+# Groups are drawn along coupling lines, not just dependency type: the
+# `platform` group keeps astro, its integrations, wrangler, and the Cloudflare
+# tooling in ONE pull request, because @astrojs/cloudflare's vite plugin moves
+# the wrangler peer floor and a split bump fails typecheck until both land.
+# Groups are limited to minor/patch; majors arrive as individual PRs.
+#
+# The `prod` and `dev` groups must list the platform patterns under
+# `exclude-patterns`. Dependabot ranks a group with no `patterns` above a
+# wildcard pattern such as `@astrojs/*` (its undocumented "specificity" rule),
+# and a pattern-less group never yields a dependency to another group. Without
+# the exclusions, the type groups take the integrations away from `platform`
+# and also bump astro and wrangler a second time. Keep the three lists in sync.
+#
+# Cooldowns hold a release back for a few days so the ecosystem shakes out
+# regressions before we take it. Security updates ignore cooldown. The
+# Cloudflare toolchain is exempt: @cloudflare/vite-plugin arrives transitively
+# (no cooldown applies) and requires the wrangler released alongside it, so a
+# cooled-down wrangler can never satisfy it. Platform PRs are review-tier, so
+# a human still looks at every one before it merges.
+#
+# Merge policy (which PRs auto-merge, and when) lives in
+# .github/workflows/dependabot-automerge.yml.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Los_Angeles
+    open-pull-requests-limit: 6
+    # @types/node tracks the Node runtime line (.nvmrc, CI): minors and patches
+    # flow; a new major arrives with the runtime upgrade.
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+      exclude:
+        - wrangler
+        - miniflare
+        - '@cloudflare/*'
+    groups:
+      platform:
+        patterns:
+          - astro
+          - '@astrojs/*'
+          - wrangler
+          - '@cloudflare/*'
+          - miniflare
+        update-types: [minor, patch]
+      prod:
+        dependency-type: production
+        exclude-patterns:
+          - astro
+          - '@astrojs/*'
+          - wrangler
+          - '@cloudflare/*'
+          - miniflare
+        update-types: [minor, patch]
+      dev:
+        dependency-type: development
+        exclude-patterns:
+          - astro
+          - '@astrojs/*'
+          - wrangler
+          - '@cloudflare/*'
+          - miniflare
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Los_Angeles
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: terraform
+    directory: /infra
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/Los_Angeles
+    cooldown:
+      default-days: 7
+    groups:
+      terraform:
+        patterns: ['*']
+        update-types: [minor, patch]

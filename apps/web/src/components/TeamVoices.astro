@@ -1,0 +1,78 @@
+---
+/**
+ * TeamVoices — a full-bleed ink-panel interlude of Quarry staff on their craft.
+ * Staggered editorial grid of indexed pull-quotes (type, whitespace, and one
+ * accent rule — no cards, no quote-mark graphics, no JS), deliberately distinct
+ * from the client-testimonial cards on the homepage. Each voice may carry a
+ * `highlight` substring that gets bolded at build time. Sits between the
+ * roster and the heritage marquee on the team page.
+ */
+import { Image } from 'astro:assets';
+import type { StaffVoice } from '@/lib/site';
+interface Props {
+  items: StaffVoice[];
+}
+const { items } = Astro.props;
+
+/** Split a quote around the first occurrence of its highlight so the template
+ *  can bold it without set:html. Returns null when there is nothing to bold. */
+const splitHighlight = (quote: string, highlight?: string) => {
+  const at = highlight ? quote.indexOf(highlight) : -1;
+  if (!highlight || at === -1) return null;
+  return { pre: quote.slice(0, at), mark: highlight, post: quote.slice(at + highlight.length) };
+};
+---
+
+<section class="section surface-dark border-y bg-(--color-ink-panel) border-(--color-ink-panel-border)">
+  <div class="container">
+    <p class="eyebrow">From the bench</p>
+    <h2 class="mt-3 max-w-[20ch] text-3xl">The standard is personal.</h2>
+
+    <div class="mt-24 grid gap-16 min-[53.75rem]:grid-cols-12 min-[53.75rem]:gap-y-24">
+      {items.map((v, i) => {
+        const parts = splitHighlight(v.quote, v.highlight);
+        // Grid placement is a positional stagger only — holds for any 2–5 voices.
+        return (
+          <figure class="group m-0 min-[53.75rem]:first:col-[1/span_8] min-[53.75rem]:even:col-[6/-1] min-[53.75rem]:odd:not-first:col-[2/span_7]">
+            {/* Aria-hidden flourish: zero-padded mono index + a short accent rule. */}
+            <div class="mb-4 flex items-center gap-3" aria-hidden="true">
+              <span class="font-mono text-xs tracking-[0.08em] text-(--color-text-muted)">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <span class="h-0.5 w-8 bg-(--color-accent)" />
+            </div>
+            {/* Lead voice reads a step larger (group-first). */}
+            <blockquote class="m-0 max-w-[36ch] font-display text-2xl font-normal leading-[1.3] tracking-[-0.01em] text-pretty text-(--color-text) group-first:text-3xl">
+              {/* Array children render adjacent — no stray space around the bold. */}
+              {parts
+                ? [
+                    parts.pre,
+                    <strong class="font-semibold text-(--color-text)">{parts.mark}</strong>,
+                    parts.post,
+                  ]
+                : v.quote}
+            </blockquote>
+            <figcaption class="mt-6 flex items-center gap-3">
+              <Image
+                class="h-14 w-14 flex-none rounded-full border border-(--color-border) object-cover"
+                src={v.avatar}
+                alt=""
+                width={56}
+                height={56}
+                densities={[1, 2]}
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="flex flex-col gap-px">
+                <span class="font-semibold text-(--color-text)">{v.author}</span>
+                <span class="font-mono text-xs text-(--color-text-muted)">
+                  {v.role} · {v.location}
+                </span>
+              </span>
+            </figcaption>
+          </figure>
+        );
+      })}
+    </div>
+  </div>
+</section>

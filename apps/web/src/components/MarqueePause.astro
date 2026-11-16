@@ -1,0 +1,47 @@
+---
+/**
+ * MarqueePause — a native, keyboard-reachable pause/resume control for a
+ * marquee (WCAG 2.2.2, Level A): the LogoWall and the ToolsSection backdrop.
+ * Zero-JS: it is a checkbox whose :checked state a page-level rule reads — via
+ * :has() on the enclosing [data-marquee-scope] wrapper — to set
+ * --lw-play: paused, which any marquee in that scope inherits (see global.css).
+ *
+ * Drop it on the heading/intro row beside the marquee; the page owns placement.
+ * It hides itself under reduced motion, where there is no motion to pause.
+ */
+interface Props {
+  /** Accessible name of the control. */
+  label?: string;
+}
+const { label = 'Pause logo animation' } = Astro.props;
+---
+
+{/* The checkbox carries the state and focus; the label is the visible chip,
+    sized past the 24px target minimum. It hides under reduced motion. */}
+<label class="relative inline-flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-full border border-(--color-border) bg-(--color-surface) text-(--color-text-muted) transition-colors duration-250 ease-out hover:text-(--color-text) has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-(--color-focus) motion-reduce:hidden">
+  {/* .marquee-pause__input is read by global.css ([data-marquee-scope]:has(...)) — keep it. */}
+  <input
+    type="checkbox"
+    class="marquee-pause__input peer absolute m-0 h-full w-full cursor-pointer opacity-0"
+  />
+  <span class="sr-only">{label}</span>
+  <svg
+    class="fill-current peer-checked:hidden"
+    viewBox="0 0 16 16"
+    width="16"
+    height="16"
+    aria-hidden="true"
+  >
+    <rect x="4" y="3" width="3" height="10" rx="1"></rect>
+    <rect x="9" y="3" width="3" height="10" rx="1"></rect>
+  </svg>
+  <svg
+    class="hidden fill-current peer-checked:block"
+    viewBox="0 0 16 16"
+    width="16"
+    height="16"
+    aria-hidden="true"
+  >
+    <path d="M5 3.5v9l8-4.5z"></path>
+  </svg>
+</label>

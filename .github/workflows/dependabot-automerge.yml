@@ -1,0 +1,217 @@
+name: Dependabot auto-merge
+
+# Merge policy for Dependabot pull requests (ADR-0018). Every Dependabot PR is
+# classified into one tier and labelled `automerge:<tier>`:
+#
+#   immediate — auto-merge is enabled the moment the PR opens. The required
+#               checks (lint/typecheck/build/test, e2e, Lighthouse) still gate
+#               the actual merge; this only removes the human click.
+#   baked     — production minors outside the platform group. The nightly
+#               `bake` job arms auto-merge once the PR has been open for
+#               BAKE_DAYS with no `hold` label — a veto window, not a gate.
+#   review    — majors and every platform-group update (ADR-0020: the
+#               Cloudflare toolchain skips cooldown, so a human reviews in
+#               its place). Nothing happens; a human reviews and merges.
+#
+# `hold` on any Dependabot PR blocks arming at every tier.
+#
+# Branch protection requires PRs to be up to date, so anything merged to main
+# puts every other Dependabot PR behind; the `nudge` job asks Dependabot to
+# rebase the ones that are armed, which keeps the train moving without an
+# operator. It runs on two triggers, and needs both:
+#
+#   on push    — a merge to main (including one Dependabot PR merging) puts the
+#                others behind, and this rebases them immediately, so a queue of
+#                armed PRs drains in one cascade instead of one per day.
+#   on schedule— nothing outside Dependabot has to happen for the train to move.
+#                A PR armed by the nightly `bake` is usually already BEHIND, and
+#                without this it would sit until something unrelated landed on
+#                main. Ordered after `bake` so a PR armed in this very run is
+#                nudged in the same run rather than 24 hours later.
+#
+# The nudge comments as the `quarry-ci-cd` machine account (secret
+# DEPENDABOT_NUDGE_TOKEN — a fine-grained token scoped to this repository's
+# pull requests), because Dependabot takes its comment commands from users with
+# push access. The token's expiry is watched by the Machine token expiry
+# workflow, which opens the rotation issue; a rejected token fails the nudge.
+#
+# Squash merges only: the signed-commits ruleset refuses rebase merges.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 14 * * *' # daily; `bake` arms PRs that have soaked, then
+    #                       `nudge` rebases whatever is armed and behind
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BAKE_DAYS: 3
+
+jobs:
+  classify:
+    name: Classify and arm
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dependabot-automerge-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Decide tier
+        id: tier
+        env:
+          ECOSYSTEM: ${{ steps.meta.outputs.package-ecosystem }}
+          UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+          DEP_TYPE: ${{ steps.meta.outputs.dependency-type }}
+          GROUP: ${{ steps.meta.outputs.dependency-group }}
+        run: |
+          case "$UPDATE_TYPE" in
+            version-update:semver-patch) semver=patch ;;
+            version-update:semver-minor) semver=minor ;;
+            *) semver=major ;;
+          esac
+          key="$ECOSYSTEM:$DEP_TYPE:${GROUP:-none}:$semver"
+          tier=review
+          case "$key" in
+            github_actions:*:*:patch | github_actions:*:*:minor) tier=immediate ;;
+            terraform:*:*:patch | terraform:*:*:minor) tier=immediate ;;
+            npm_and_yarn:*:platform:*) tier=review ;;
+            npm_and_yarn:direct:development:*:patch | npm_and_yarn:direct:development:*:minor) tier=immediate ;;
+            npm_and_yarn:*:*:patch) tier=immediate ;;
+            npm_and_yarn:*:*:minor) tier=baked ;;
+          esac
+          echo "key=$key tier=$tier"
+          echo "tier=$tier" >> "$GITHUB_OUTPUT"
+
+      - name: Label the tier
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+          TIER: ${{ steps.tier.outputs.tier }}
+        run: |
+          for t in immediate baked review; do
+            [ "$t" = "$TIER" ] || gh pr edit "$PR" --remove-label "automerge:$t" 2>/dev/null || true
+          done
+          gh pr edit "$PR" --add-label "automerge:$TIER"
+
+      - name: Enable auto-merge (immediate tier)
+        if: >-
+          steps.tier.outputs.tier == 'immediate' &&
+          !contains(github.event.pull_request.labels.*.name, 'hold')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          if [ "$(gh pr view "$PR" --json autoMergeRequest --jq '.autoMergeRequest != null')" = "true" ]; then
+            echo "auto-merge already enabled"
+          else
+            gh pr merge --auto --squash "$PR"
+          fi
+
+  bake:
+    name: Arm auto-merge on baked PRs
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Arm PRs open longer than the bake window
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          cutoff=$(date -u -d "-${BAKE_DAYS} days" +%Y-%m-%dT%H:%M:%SZ)
+          gh pr list --repo "$REPO" --author app/dependabot --state open \
+              --label automerge:baked --json url,createdAt,labels,autoMergeRequest \
+            | jq -r --arg cutoff "$cutoff" '
+                .[]
+                | select(.autoMergeRequest == null)
+                | select(.createdAt < $cutoff)
+                | select(([.labels[].name] | index("hold")) == null)
+                | .url' \
+            | while read -r url; do
+                echo "arming $url (open since before $cutoff)"
+                gh pr merge --auto --squash "$url"
+              done
+
+  nudge:
+    name: Rebase armed PRs that are behind main
+    # `needs: bake` orders this after arming on the scheduled path. On push,
+    # `bake` is skipped, and a skipped dependency would skip this job too —
+    # hence `!cancelled()`, which lets it run whether `bake` succeeded, was
+    # skipped, or failed.
+    needs: [bake]
+    if: >-
+      !cancelled()
+      && (github.event_name == 'push'
+          || github.event_name == 'schedule'
+          || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # One nudge at a time: back-to-back pushes to main queue behind the running
+    # job, so each run sees the previous run's comments.
+    concurrency:
+      group: dependabot-nudge
+      cancel-in-progress: false
+    steps:
+      - name: Check the machine-account token
+        id: token
+        env:
+          NUDGE_TOKEN: ${{ secrets.DEPENDABOT_NUDGE_TOKEN }}
+        run: |
+          # An expired, revoked, or unset token answers 401. The Machine token
+          # expiry workflow opens the rotation issue; this job only refuses to
+          # comment with a token the API rejects.
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+                     -H "Authorization: Bearer $NUDGE_TOKEN" \
+                     -H "X-GitHub-Api-Version: 2022-11-28" \
+                     https://api.github.com/user || true)
+          if [ "$status" != "200" ]; then
+            echo "::error::DEPENDABOT_NUDGE_TOKEN is rejected by the API (HTTP $status)"
+            echo "state=invalid" >> "$GITHUB_OUTPUT"
+          else
+            echo "state=ok" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ask Dependabot to rebase armed PRs that are behind main
+        if: steps.token.outputs.state != 'invalid'
+        env:
+          GH_TOKEN: ${{ secrets.DEPENDABOT_NUDGE_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # GitHub recomputes mergeability asynchronously after a push, so a PR
+          # can report UNKNOWN for a few seconds; retry while any armed PR
+          # still does. On the scheduled path mergeability is already settled
+          # and this falls through on the first pass.
+          for attempt in 1 2 3 4; do
+            sleep 30
+            prs=$(gh pr list --repo "$REPO" --author app/dependabot --state open \
+                    --json url,mergeStateStatus,autoMergeRequest \
+                  | jq -c '[.[] | select(.autoMergeRequest != null)]')
+            [ "$(jq 'any(.[]; .mergeStateStatus == "UNKNOWN")' <<<"$prs")" = "true" ] || break
+          done
+          jq -r '.[] | select(.mergeStateStatus == "BEHIND") | .url' <<<"$prs" \
+            | while read -r url; do
+                echo "rebasing $url"
+                gh pr comment "$url" --body "@dependabot rebase"
+              done
+
+      - name: Fail while the token is rejected
+        if: steps.token.outputs.state == 'invalid'
+        run: |
+          echo "::error::DEPENDABOT_NUDGE_TOKEN must be replaced; the Machine token expiry workflow's rotation issue has the steps."
+          exit 1

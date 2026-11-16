@@ -1,0 +1,767 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import Button from '@/components/Button.astro';
+import CtaBand from '@/components/CtaBand.astro';
+import LogoWall from '@/components/LogoWall.astro';
+import MarqueePause from '@/components/MarqueePause.astro';
+import Testimonials from '@/components/Testimonials.astro';
+import ToolsSection from '@/components/ToolsSection.astro';
+import StatBand from '@/components/StatBand.astro';
+import Compliance from '@/components/Compliance.astro';
+import { site, primaryCta, clientLogos, stackLogos, testimonials, firmStats } from '@/lib/site';
+
+const allCases = (await getCollection('cases')).filter((c) => !c.data.draft && !c.data.comingSoon);
+const featured = allCases
+  .filter((c) => c.data.featured)
+  .sort((a, b) => a.data.order - b.data.order);
+const hero = featured[0];
+
+const pillars = [
+  {
+    n: '01',
+    title: 'Outcomes, not deliverables',
+    body: 'A membership grown 40× to 250,000+. A $1M+ upgrade flow. Launch builds 7.5× faster. We lead with the numbers because we earn them.',
+  },
+  {
+    n: '02',
+    title: 'Senior, end-to-end',
+    body: 'One team across product ownership, UX/UI, full-stack engineering, DevOps, and data. Every hand on your product is senior, start to finish.',
+  },
+  {
+    n: '03',
+    title: 'Craft you can inspect',
+    body: 'Open DevTools. Run Lighthouse. Read the case studies. The proof is in the build, this site included.',
+  },
+];
+---
+
+<Base
+  type="website"
+  title="Quarry — Digital products that move the numbers"
+  titleAbsolute
+  description="An elite, globally-distributed product and engineering team: strategy, design, code, and data. $210M+ in client revenue on platforms we’ve built and maintain."
+>
+  <!-- HERO -->
+  <section class="relative isolate overflow-clip pt-[clamp(3rem,1.5rem+7vw,8rem)] pb-[clamp(2rem,1rem+4vw,4rem)]">
+    <div class="pointer-events-none absolute inset-0 z-0 overflow-clip" aria-hidden="true">
+      <!-- Elevation scale — sheet hardware on the right margin. 1px ticks on
+           an 88px (2×44) rhythm with mono depth marks. Desktop only. -->
+      <div class="hero__scale absolute top-22 right-3 hidden flex-col items-end gap-[77px] min-[68.75rem]:flex">
+        <span class="flex h-[11px] items-center gap-2 font-mono text-[11px] leading-none text-(--color-text-muted) after:h-px after:w-3.5 after:bg-(--color-border) after:content-['']">
+          0
+        </span>
+        <span class="flex h-[11px] items-center gap-2 font-mono text-[11px] leading-none text-(--color-text-muted) after:h-px after:w-3.5 after:bg-(--color-border) after:content-['']">
+          −88
+        </span>
+        <span class="flex h-[11px] items-center gap-2 font-mono text-[11px] leading-none text-(--color-text-muted) after:h-px after:w-3.5 after:bg-(--color-border) after:content-['']">
+          −176
+        </span>
+      </div>
+    </div>
+    <div class="container relative z-[1]">
+      <!-- The Pit — an open-pit survey plan on the 44px module. Six benches
+           descend to the floor; a stepped haul ramp switchbacks in from the
+           top-right, cut through the bench strokes by a mask. Decorative;
+           draws on once after load, then sits static (surveyed, then built).
+           Anchored to the container's right edge and bleeding past it
+           (.hero has overflow: clip). z-index: -1 paints it behind the text. -->
+      <div class="hero__pit" aria-hidden="true">
+        <svg
+          class="h-auto w-full"
+          viewBox="0 0 880 760"
+          width="880"
+          height="760"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <!-- Haul-ramp cut: white shows the rings, the black stepped
+                 corridor (38px wide centerline stroke) erases their strokes
+                 where the road descends. Region oversized — rings 1-2 extend
+                 past the viewBox and must still be masked white. -->
+            <mask
+              id="pit-cut"
+              maskUnits="userSpaceOnUse"
+              x="-200"
+              y="-200"
+              width="1400"
+              height="1200"
+            >
+              <rect x="-200" y="-200" width="1400" height="1200" fill="#fff"></rect>
+              <polyline
+                points="792,-200 792,0 660,0 660,88 528,88 528,176 616,176 616,264"
+                fill="none"
+                stroke="#000"
+                stroke-width="38"
+              ></polyline>
+            </mask>
+          </defs>
+          <!-- Benches: orthogonal 44-quantized rings, fillets halving inward
+               (88→66→44→22→16→11), per-side insets varied in whole 44s,
+               centers drifting down-right (418,330 → 550,374). -->
+          <g mask="url(#pit-cut)">
+            <rect
+              class="pit__ring pit__ring--1"
+              x="0"
+              y="-176"
+              width="1144"
+              height="1188"
+              rx="88"
+            ></rect>
+            <rect
+              class="pit__ring pit__ring--2"
+              x="88"
+              y="-88"
+              width="1012"
+              height="968"
+              rx="66"
+            ></rect>
+            <rect
+              class="pit__ring pit__ring--3"
+              x="176"
+              y="44"
+              width="792"
+              height="660"
+              rx="44"
+            ></rect>
+            <rect
+              class="pit__ring pit__ring--4"
+              x="308"
+              y="132"
+              width="528"
+              height="440"
+              rx="22"
+            ></rect>
+            <rect
+              class="pit__ring pit__ring--5"
+              x="396"
+              y="220"
+              width="308"
+              height="264"
+              rx="16"
+            ></rect>
+            <rect
+              class="pit__ring pit__ring--floor"
+              x="484"
+              y="264"
+              width="176"
+              height="132"
+              rx="11"
+            ></rect>
+            <!-- Surveyor's lights: short bright dash segments orbiting the
+                 inner benches at staggered periods — quiet ambient motion
+                 after the survey has drawn. Same geometry as rings 3–floor,
+                 so the ramp cut and the type-zone fade apply to them too. -->
+            <rect
+              class="pit__trace pit__trace--3"
+              x="176"
+              y="44"
+              width="792"
+              height="660"
+              rx="44"
+            ></rect>
+            <rect
+              class="pit__trace pit__trace--4"
+              x="308"
+              y="132"
+              width="528"
+              height="440"
+              rx="22"
+            ></rect>
+            <rect
+              class="pit__trace pit__trace--5"
+              x="396"
+              y="220"
+              width="308"
+              height="264"
+              rx="16"
+            ></rect>
+            <rect
+              class="pit__trace pit__trace--floor"
+              x="484"
+              y="264"
+              width="176"
+              height="132"
+              rx="11"
+            ></rect>
+          </g>
+          <!-- Ramp edges: the corridor's two boundaries (centerline ±19px). -->
+          <polyline
+            class="pit__ramp"
+            points="773,-200 773,19 641,19 641,107 509,107 509,195 597,195 597,264"
+          ></polyline>
+          <polyline
+            class="pit__ramp"
+            points="811,-200 811,-19 679,-19 679,69 547,69 547,157 635,157 635,264"
+          ></polyline>
+          <!-- The ember moment: the extracted block at the pit floor's center. -->
+          <g transform="rotate(45 572 330)">
+            <rect class="pit__ember" x="568.5" y="326.5" width="7" height="7"></rect>
+          </g>
+          <text class="pit__note pit__note--el" x="572" y="358" text-anchor="middle">
+            EL −264 · QRY/01
+          </text>
+          <text class="pit__note pit__note--bench" x="252" y="640">
+            BENCH 03
+          </text>
+          <text class="pit__note pit__note--depth" x="770" y="300" text-anchor="middle">
+            −132
+          </text>
+        </svg>
+      </div>
+      <p class="eyebrow hero__eyebrow">Elite product &amp; engineering · since {site.founded}</p>
+      <h1 class="mt-4 max-w-[min(22ch,100%)] text-5xl">
+        <span class="hero__line hero__line--1 block">We build digital products</span>
+        <span class="hero__line hero__line--2 block">that move the numbers</span>
+        <span class="hero__line hero__line--3 block italic">and respect the humans.</span>
+      </h1>
+      <p class="hero__lede measure mt-6 text-lg text-(--color-text-muted)">
+        A senior product, design, and engineering team that embeds like the best in-house team
+        you’ve ever had. We answer for outcomes.
+      </p>
+      <!-- Datum hairline — joins the type column to the ground drawing; sits
+           between the lede and the CTAs so it never strikes through text. -->
+      <div
+        class="hero__datum mt-8 h-px w-[calc(33.3%+109px)] max-w-full bg-(--color-border)"
+        aria-hidden="true"
+      ></div>
+      <div class="hero__cta mt-8 flex flex-wrap gap-3">
+        <Button href={primaryCta.href} size="lg">
+          {primaryCta.label}
+        </Button>
+        <Button href="/work" variant="secondary" size="lg">
+          See our work
+        </Button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOGO GARDEN -->
+  <section class="border-y border-(--color-border) py-8">
+    <div class="container" data-marquee-scope>
+      <div class="marquee-head">
+        <p class="eyebrow">Trusted by category leaders</p>
+        <MarqueePause />
+      </div>
+      <LogoWall items={clientLogos} class="mt-6" />
+    </div>
+  </section>
+
+  <!-- PROOF PILLARS -->
+  <section class="section">
+    <div class="container">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {pillars.map((p) => (
+          <article class="rounded-lg border border-(--color-border) bg-(--color-surface) p-8">
+            <span class="font-mono text-sm tracking-[0.1em] text-(--color-accent-ink,--color-accent)">
+              {p.n}
+            </span>
+            <h2 class="mt-3 text-2xl">{p.title}</h2>
+            <p class="mt-3 text-(--color-text-muted)">{p.body}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- TRACK RECORD -->
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Track record</p>
+      <h2 class="mt-3 max-w-[20ch] text-3xl">Outcomes, in the aggregate.</h2>
+      <StatBand items={firmStats} class="mt-12" />
+      <p class="measure mt-8 text-(--color-text-muted)">
+        Our client partners have been acquired four times, three of them by public companies. Every
+        figure is a floor, computed from systems we built or maintain and from public sources:{' '}
+        <a href="/track-record">see how we count</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- FEATURED CASE -->
+  {hero && (
+    <section class="section">
+      <div class="container">
+        <a
+          class="surface-dark group grid grid-cols-1 gap-8 rounded-xl border border-(--color-ink-panel-border) bg-(--color-ink-panel) p-[clamp(1.5rem,1rem+3vw,3.5rem)] text-stone-25 no-underline transition-transform duration-250 ease-out hover:-translate-y-0.5 md:grid-cols-[1.5fr_1fr]"
+          href={`/work/${hero.id}`}
+        >
+          <div>
+            <p class="eyebrow text-blue-300">Featured case · {hero.data.client}</p>
+            <h2 class="mt-3 max-w-[18ch] text-3xl text-stone-25">{hero.data.title}</h2>
+            <p class="mt-4 max-w-[52ch] text-stone-300">{hero.data.summary}</p>
+            <span class="mt-6 inline-block font-semibold text-blue-300">Read the case →</span>
+          </div>
+          <div class="md:self-center md:border-l md:border-stone-700 md:pl-[clamp(1.5rem,1rem+2vw,2.5rem)] md:transition-colors md:duration-250 md:ease-out md:group-hover:border-stone-600">
+            {hero.data.outcome.stat ? (
+              <div>
+                {hero.data.outcome.kicker && (
+                  <p class="m-0 font-mono text-xs uppercase tracking-[0.08em] text-stone-400">
+                    {hero.data.outcome.kicker}
+                  </p>
+                )}
+                {hero.data.outcome.supporting.length === 2 ? (
+                  <div class="mt-3 flex flex-col gap-6">
+                    <div>
+                      <span class="block font-display text-3xl leading-none text-ember-500">
+                        {hero.data.outcome.stat.value}
+                      </span>
+                      <span class="mt-2 block text-sm text-stone-300">
+                        {hero.data.outcome.stat.label}
+                      </span>
+                    </div>
+                    {hero.data.outcome.supporting.map((s) => (
+                      <div>
+                        <span class="block font-display text-3xl leading-none text-stone-25">
+                          {s.value}
+                        </span>
+                        <span class="mt-2 block text-sm text-stone-300">{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <p class="m-0 mt-3 font-display text-5xl leading-none text-ember-500">
+                      {hero.data.outcome.stat.value}
+                    </p>
+                    <p class="m-0 mt-2 text-base text-stone-300">{hero.data.outcome.stat.label}</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <p class="m-0 font-display text-2xl leading-[1.3] text-stone-25">
+                {hero.data.outcome.kicker && (
+                  <strong class="font-bold text-ember-500">{hero.data.outcome.kicker}</strong>
+                )}{' '}
+                {hero.data.outcome.headline}
+              </p>
+            )}
+          </div>
+        </a>
+      </div>
+    </section>
+  )}
+
+  <!-- TESTIMONIALS -->
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">What clients say</p>
+      <h2 class="mt-3 max-w-[20ch] text-3xl">Teams trust us with the work that matters.</h2>
+      <Testimonials items={testimonials} class="mt-12" />
+    </div>
+  </section>
+
+  <!-- PURPOSE — the why, placed after the proof arc and before the what.
+       A single-column statement framed by hairlines on the page surface: the
+       first sentence carries the heading, the other two follow as one muted
+       paragraph. -->
+  <section class="section border-y border-(--color-border)">
+    <div class="container">
+      <p class="eyebrow">Our purpose</p>
+      <h2 class="mt-3 max-w-[30ch] text-3xl">{site.purpose[0]}</h2>
+      <p class="measure mt-6 text-xl text-(--color-text-muted)">
+        {site.purpose.slice(1).join(' ')}
+      </p>
+      <Button href="/team" variant="ghost" class="mt-8">
+        Meet the collective →
+      </Button>
+    </div>
+  </section>
+
+  <!-- SERVICES SNAPSHOT -->
+  <section class="section">
+    <div class="container grid grid-cols-1 gap-8 md:grid-cols-2">
+      <div>
+        <p class="eyebrow">What we do</p>
+        <h2 class="max-w-[16ch] text-3xl">
+          Strategy, design, engineering, commerce, and data. One team.
+        </h2>
+      </div>
+      <div>
+        <p class="mb-4 text-lg text-(--color-text-muted)">
+          We embed like your best in-house team and own outcomes end to end: from product ownership
+          and humane UX/UI through scalable full-stack engineering, DevOps, and privacy-first data.
+          Engage us by project, embedded, or fractional.
+        </p>
+        <Button href="/services" variant="ghost">
+          Explore services →
+        </Button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAST · GOOD · AFFORDABLE -->
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Unicorns do exist</p>
+      <h2 class="mt-3 max-w-[20ch] text-3xl">
+        Fast. Good. Affordable.{' '}
+        <span class="text-(--color-accent-ink,--color-accent)">All three.</span>
+      </h2>
+      <p class="measure mt-4 text-lg text-(--color-text-muted)">
+        Speed, quality, and price usually trade off. A fractional elite team without big-agency
+        overhead doesn’t have to choose.
+      </p>
+      <ul
+        class="m-0 mt-12 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-3 md:gap-8"
+        role="list"
+      >
+        <li class="border-t-2 border-(--color-accent) pt-4">
+          <span class="block font-display text-2xl">Fast</span>
+          <span class="mt-2 block text-(--color-text-muted)">
+            Senior team, no ramp-up. One client’s launch builds went 7.5× faster.
+          </span>
+        </li>
+        <li class="border-t-2 border-(--color-accent) pt-4">
+          <span class="block font-display text-2xl">Good</span>
+          <span class="mt-2 block text-(--color-text-muted)">
+            Exacting craft, no asterisks. Inspect the work; it holds up.
+          </span>
+        </li>
+        <li class="border-t-2 border-(--color-accent) pt-4">
+          <span class="block font-display text-2xl">Affordable</span>
+          <span class="mt-2 block text-(--color-text-muted)">
+            Fractional, a la carte capacity — no full-time salaries, benefits, or overhead.
+          </span>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- TOOLS OF OUR TRADE -->
+  <ToolsSection
+    eyebrow="Capabilities · Stack"
+    heading="Deliberate about tools. Fluent across the stack."
+    intro="A representative slice of what we design, build, and operate in production — chosen for the job, not the trend."
+    items={stackLogos}
+  />
+
+  <!-- REGULATED ENVIRONMENTS -->
+  <Compliance class="section" />
+
+  <!-- CTA BAND -->
+  <section class="section">
+    <div class="container">
+      <CtaBand
+        title="Have something worth building well?"
+        sub="Tell us what you’re working on. We reply within one business day."
+      />
+    </div>
+  </section>
+</Base>
+
+<style>
+  /* Whitelisted residual: the hero pit survey drawing and entrance
+     choreography — @keyframes, per-element animation-delay staggers (with the
+     max-859px re-choreography), the pit's mask-image fade + theme-tracking
+     dark pair, and the reduced-motion overrides. Layout/type/color for the
+     same elements lives in utilities on the markup; these rules only carry
+     what utilities can't express readably. */
+  .hero__scale {
+    animation: hero-fade var(--dur-2) var(--ease-out) 1300ms both;
+  }
+  /* The Pit — absolutely positioned against the content container
+     (.hero__content is the positioned ancestor) and deliberately BLEEDING:
+     right -120px pushes the rim past the container/viewport edge, top -80px
+     continues it past the hero top (.hero's overflow: clip eats both).
+     z-index: -1 paints it behind the (background-free) text within
+     .hero__content's stacking context. Fixed aspect ratio + explicit SVG
+     width/height ⇒ zero CLS. */
+  .hero__pit {
+    position: absolute;
+    top: -80px;
+    right: -120px;
+    z-index: -1;
+    width: min(880px, 58%);
+    aspect-ratio: 880 / 760;
+    pointer-events: none;
+    /* Recede under the type: dim the drawing's left zone (where the headline
+       overlaps) and let it come up to full strength toward the floor. Masks
+       the PIT rather than scrimming the text, so the background stays pure.
+       Dark theme dims harder — bright strokes under white glyphs read noisy. */
+    --pit-fade: 0.7;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      rgb(0 0 0 / var(--pit-fade)) 0%,
+      rgb(0 0 0 / var(--pit-fade)) 32%,
+      #000 58%
+    );
+    mask-image: linear-gradient(
+      to right,
+      rgb(0 0 0 / var(--pit-fade)) 0%,
+      rgb(0 0 0 / var(--pit-fade)) 32%,
+      #000 58%
+    );
+  }
+  :global(:root[data-theme='dark']) .hero__pit {
+    --pit-fade: 0.32;
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .hero__pit {
+      --pit-fade: 0.32;
+    }
+  }
+  /* Resting styles below ARE the finished state (dashoffset 0 = fully drawn,
+     ember/annotations visible). The one-shot keyframes only supply `from`, so
+     with animations disabled everything sits at its final, surveyed state. */
+  .pit__ring {
+    fill: none;
+    /* Dash with the measured path length (--len, set per-ring on the modifier
+       rules below: rounded-rect
+       perimeter 2(w+h) − 8r + 2πr, padded ~5%). CSS px on SVG geometry are
+       user units, and Chrome does not pathLength-scale CSS dash values —
+       normalized pathLength="1" + dasharray:1 renders as an invisible
+       1-unit micro-dash. */
+    stroke-dasharray: var(--len);
+    stroke-dashoffset: 0;
+    animation: hero-draw 500ms var(--ease-out) both;
+  }
+  /* Depth = weight: faint stone at the rim, full primary at the floor. */
+  .pit__ring--1 {
+    --len: 4700;
+    stroke: var(--color-border);
+    stroke-width: 1;
+    animation-delay: 0ms;
+  }
+  .pit__ring--2 {
+    --len: 4000;
+    stroke: var(--color-border-strong);
+    stroke-width: 1.25;
+    animation-delay: 120ms;
+  }
+  .pit__ring--3,
+  .pit__ring--4 {
+    stroke: color-mix(in oklab, var(--color-primary) 70%, transparent);
+    stroke-width: 1.75;
+  }
+  .pit__ring--3 {
+    --len: 2960;
+    animation-delay: 240ms;
+  }
+  .pit__ring--4 {
+    --len: 1990;
+    animation-delay: 360ms;
+  }
+  .pit__ring--5 {
+    --len: 1180;
+    stroke: var(--color-primary);
+    stroke-width: 2.5;
+    animation-delay: 480ms;
+  }
+  .pit__ring--floor {
+    --len: 630;
+    stroke: var(--color-primary);
+    stroke-width: 3.5;
+    animation-delay: 600ms; /* floor completes ≈1100ms */
+  }
+  .pit__ramp {
+    --len: 900;
+    fill: none;
+    stroke: var(--color-border-strong);
+    stroke-width: 1;
+    stroke-dasharray: var(--len);
+    stroke-dashoffset: 0;
+    animation: hero-draw 350ms var(--ease-out) 900ms both;
+  }
+  /* Surveyor's lights — a short bright segment orbiting each inner bench.
+     Dash pattern = glint + full-perimeter gap; offsetting by one full cycle
+     loops seamlessly. Periods differ per ring so the lights never sync.
+     They fade in only after the survey has finished drawing. */
+  .pit__trace {
+    fill: none;
+    stroke: color-mix(in oklab, var(--color-primary) 45%, var(--color-text));
+    stroke-width: 2;
+    stroke-linecap: round;
+    opacity: 0.85;
+    stroke-dasharray: var(--dash) var(--gap);
+    stroke-dashoffset: 0;
+    animation:
+      pit-trace-in 600ms var(--ease-out) 1600ms both,
+      pit-trace var(--dur) linear 1600ms infinite;
+  }
+  .pit__trace--3 {
+    --dash: 60;
+    --gap: 2960;
+    --cycle: -3020px;
+    --dur: 52s;
+  }
+  .pit__trace--4 {
+    --dash: 52;
+    --gap: 1990;
+    --cycle: -2042px;
+    --dur: 41s;
+  }
+  .pit__trace--5 {
+    --dash: 40;
+    --gap: 1180;
+    --cycle: -1220px;
+    --dur: 33s;
+  }
+  .pit__trace--floor {
+    --dash: 28;
+    --gap: 630;
+    --cycle: -658px;
+    --dur: 26s;
+  }
+  /* The ember moment — the extracted block. Rotation lives on the parent <g>
+     (attribute transform) so the pop's CSS transform can't clobber it. */
+  .pit__ember {
+    fill: var(--color-accent);
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: hero-pop var(--dur-2) var(--ease-out) 1250ms both;
+  }
+  .pit__note {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    fill: var(--color-text-muted);
+    animation: hero-fade var(--dur-2) var(--ease-out) both;
+  }
+  .pit__note--el {
+    animation-delay: 1250ms;
+  }
+  .pit__note--bench {
+    animation-delay: 1320ms;
+  }
+  .pit__note--depth {
+    animation-delay: 1400ms;
+  }
+  .hero__datum {
+    animation: hero-fade var(--dur-2) var(--ease-out) 1300ms both;
+  }
+  /* —— Entrance choreography (opacity/transform only; layout is final from
+     first frame — zero CLS). `from`-only keyframes resolve to base styles.
+     Ground first: the rings start at 0ms; type lands one beat later. —— */
+  .hero__eyebrow {
+    --rise: 8px;
+    animation: hero-rise 450ms var(--ease-out) 150ms both;
+  }
+  .hero__line {
+    --rise: 14px;
+    animation: hero-rise var(--dur-4) var(--ease-out) both;
+  }
+  .hero__line--1 {
+    animation-delay: 240ms;
+  }
+  .hero__line--2 {
+    animation-delay: 330ms;
+  }
+  .hero__line--3 {
+    animation-delay: 420ms;
+  }
+  .hero__lede {
+    --rise: 10px;
+    animation: hero-rise 500ms var(--ease-out) 500ms both;
+  }
+  .hero__cta {
+    --rise: 10px;
+    animation: hero-rise 500ms var(--ease-out) 600ms both;
+  }
+  /* Mobile gets a tighter reveal: the H1 is the LCP element, and on throttled
+     devices the full stagger pushed LCP ~1s past FCP. Half the delay budget
+     keeps the choreography and reclaims the metric. */
+  @media (max-width: 53.6875rem) {
+    .hero__eyebrow {
+      animation-delay: 60ms;
+      animation-duration: 350ms;
+    }
+    .hero__line {
+      animation-duration: 400ms;
+    }
+    .hero__line--1 {
+      animation-delay: 100ms;
+    }
+    .hero__line--2 {
+      animation-delay: 160ms;
+    }
+    .hero__line--3 {
+      animation-delay: 220ms;
+    }
+    .hero__lede {
+      animation-delay: 280ms;
+      animation-duration: 400ms;
+    }
+    .hero__cta {
+      animation-delay: 340ms;
+      animation-duration: 400ms;
+    }
+  }
+  @keyframes hero-rise {
+    from {
+      /* 0.01, not 0: LCP ignores elements whose first paint is at exactly
+         opacity 0, and everything LCP-eligible above the fold rides this
+         keyframe — at 0 the H1 never becomes a candidate, Lighthouse reports
+         NO_LCP for the page, and field LCP lands on an incidental label.
+         One imperceptible hundredth keeps the choreography and the metric. */
+      opacity: 0.01;
+      transform: translateY(var(--rise, 10px));
+    }
+  }
+  @keyframes hero-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes hero-draw {
+    from {
+      stroke-dashoffset: var(--len);
+    }
+  }
+  @keyframes pit-trace-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pit-trace {
+    to {
+      /* One full dash cycle, precomputed as a plain length per element —
+         calc() over the unitless dash vars makes the interpolation discrete
+         in Chrome (the glint would teleport instead of orbit). */
+      stroke-dashoffset: var(--cycle);
+    }
+  }
+  @keyframes hero-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.6);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* The global kill-switch (global.css) zeroes durations and delays, but
+       dropping the animations outright is still the cleanest semantics here:
+       all resting styles above equal the final keyframe state, so the hero
+       snaps straight to the full survey, instantly. */
+    .hero__eyebrow,
+    .hero__line,
+    .hero__lede,
+    .hero__cta,
+    .hero__datum,
+    .hero__scale,
+    .pit__ring,
+    .pit__ramp,
+    .pit__ember,
+    .pit__note {
+      animation: none;
+    }
+    /* The orbiting lights are pure motion — nothing to show statically. */
+    .pit__trace {
+      display: none;
+    }
+  }
+  /* Mobile — the pit scales down and tucks behind/below the text at reduced
+     opacity; the right bleed is maintained and .hero's overflow: clip guards
+     against horizontal scroll. Annotations are texture we can spare here. */
+  @media (max-width: 53.6875rem) {
+    .hero__pit {
+      top: auto;
+      right: -96px;
+      bottom: -3rem;
+      width: min(560px, 96%);
+      opacity: 0.3;
+    }
+    .pit__note {
+      display: none;
+    }
+  }
+</style>

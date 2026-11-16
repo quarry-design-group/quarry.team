@@ -1,0 +1,45 @@
+---
+import { getCollection } from 'astro:content';
+import { getImage } from 'astro:assets';
+import Base from '@/layouts/Base.astro';
+import WorkGrid from '@/components/WorkGrid.astro';
+import { byCaseOrder, isPublished } from '@/lib/work';
+
+// The first card's hero is this page's LCP element. Preload it with the exact
+// srcset/sizes CaseCard's <Image> renders, so the fetch starts with the HTML
+// and requests the same derivatives. WorkGrid lists the cases in this order.
+const first = (await getCollection('cases')).filter(isPublished).sort(byCaseOrder)[0];
+const lcpHero = first?.data.hero
+  ? await getImage({ src: first.data.hero, widths: [400, 800] })
+  : undefined;
+---
+
+<Base
+  title="Case studies: real products, real numbers"
+  description="Case studies with real numbers: a membership grown 40×, a $40k week-one revenue lift, launch builds 7.5× faster. What a senior team does with full ownership."
+  image="/og/work.png"
+  imageAlt="Outcomes with receipts. Selected Quarry case studies, 2016–present."
+>
+  {lcpHero && (
+    <link
+      slot="head"
+      rel="preload"
+      as="image"
+      imagesrcset={lcpHero.srcSet.attribute}
+      imagesizes="(min-width:700px) 50vw, 100vw"
+      fetchpriority="high"
+    />
+  )}
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Selected work</p>
+      <h1 class="mt-3 text-4xl">Outcomes we’re proud to show.</h1>
+      <p class="measure mt-4 text-lg text-(--color-text-muted)">
+        A sample of what happens when an elite, senior team owns the work end to end. The numbers
+        are real; the craft is inspectable.
+      </p>
+
+      <WorkGrid />
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,53 @@
+---
+# Cited in the /compliance evidence ledger (apps/web/src/lib/compliance.ts) — keep that claim in sync.
+title: 'Securing e-commerce with a swift response to a card skimming attack'
+client: 'Confidential'
+summary: 'When attackers injected a card skimmer through a Magento SQL-injection flaw, we contained the breach, cleaned the storefront, and secured the platform.'
+disciplines: ['engineering', 'ecommerce', 'data']
+industry: 'eCommerce'
+outcome:
+  kicker: 'Contained.'
+  headline: "Skimmer removed, Magento patched current, and PayPal's forensic investigation closed."
+releasedDate: 2024-10-24
+hero: ./hero.jpg
+heroAlt: 'Clear crystalline shard glowing with iridescent blue, green and pink light against a black background'
+featured: true
+order: 10
+---
+
+## The Challenge
+
+The client’s e-commerce site, running on an outdated version of [Magento](https://business.adobe.com/products/magento/magento-commerce.html), was targeted by cybercriminals exploiting a known SQL injection vulnerability.
+
+The attackers injected malicious JavaScript into the merchant’s shopping cart, which then skimmed customers’ credit card information during checkout. This led to a series of outcomes:
+
+- Potential fraud affecting numerous customers
+- A serious digital forensics investigation by PayPal
+- Additional inquiries from financial institutions like Wells Fargo
+- Risk of substantial fines and reputational damage
+- Daily reinfection attempts by the attackers
+
+The key issues that the client was facing grew and grew as a result of this incident:
+
+- Outdated e-commerce platform with known vulnerabilities
+- Resistance to regular software updates due to perceived costs
+- Ongoing data breach affecting customer financial information
+- Complex forensic investigations and potential regulatory consequences
+
+## The Solution
+
+Quarry’s team quickly diagnosed the issue and implemented a multi-step solution:
+
+First, we applied an emergency patch for the specific vulnerability, despite the patch not offering official support for the client’s current version of Magento due to how outdated it was.
+
+Next up was daily monitoring and upgrades. It turned out that the attackers were not exploiting the specific vulnerability that the emergency patch addressed, so we began conducting regular checks to remove any reinjected malicious scripts. At the same time, we were able to convince the client of the necessity to upgrade their Magento installation to the latest version, closing numerous security gaps with how outdated their current version was.
+
+Finally, we assisted the client in responding to PayPal’s digital forensic incident response (DFIR) investigation, along with similar inquiries from other financial institutions. Cardholder data is governed by PCI DSS, and a skimming breach puts a merchant’s standing under that framework directly at issue — the containment, eradication, evidence handling, and reporting we carried through are exactly the incident-response obligations it exists to enforce.
+
+## The Results
+
+Quarry not only resolved the client’s crisis but also strengthened their overall security posture. We were successful in halting the ongoing card skimming attack and successfully upgraded the client’s e-commerce platform to the latest, most secure version.
+
+Throughout this process, we guided the client through complex forensic investigations and demonstrated the critical importance of regular software updates. Our swift and comprehensive response prevented potential fines and further reputational damage. The project required over 50 hours of intensive work, showcasing Quarry’s deep commitment to client security and our ability to handle high-stakes situations with expertise.
+
+The moral of this story? Avoid the risks of cyber security incidents by keeping your organization’s software stack upgraded to the latest official releases in a timely manner. The client’s costs to keep their Magento version current could have been half of what it cost to respond to and remediate this incident.

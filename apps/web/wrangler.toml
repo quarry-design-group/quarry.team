@@ -1,0 +1,182 @@
+# Cloudflare Worker config for the Quarry site (source of truth for bindings,
+# routes, and compatibility). The @astrojs/cloudflare adapter reads this at
+# build time — selecting the environment from CLOUDFLARE_ENV (unset = top-level
+# production, "staging" = [env.staging]) — and emits the fully-resolved,
+# deployable config to dist/server/wrangler.json with `assets` (dist/client)
+# injected and `main` resolved to the built Worker. `main` here names our own
+# entry (src/worker.ts, ADR-0019); `assets` only pins serving options. Deploys
+# must target the emitted config. See ADR-0014 / ADR-0006 / ADR-0013.
+#
+# Deploy (from apps/web, after `pnpm --filter @quarry/web build`):
+#   production: wrangler d1 migrations apply marketing-site-form-submissions --remote -c dist/server/wrangler.json
+#               wrangler deploy -c dist/server/wrangler.json
+#   staging:    build with CLOUDFLARE_ENV=staging, then the same two commands
+#               with the -staging database name.
+name = "quarry-web"
+compatibility_date = "2026-04-15"
+compatibility_flags = ["nodejs_compat"]
+
+# The Worker entry: a wrapper around the adapter's handler that stamps a
+# per-request CSP nonce on every HTML response, so the bot-detection script
+# Cloudflare injects at the edge runs under the strict policy (ADR-0019).
+# Environments inherit `main`.
+main = "src/worker.ts"
+
+# Canonical hosts only — no workers.dev hostname for the production Worker.
+workers_dev = false
+
+# Serve the apex + www on this Worker; Cloudflare manages these custom-domain
+# DNS records on deploy (so Terraform does not own apex/www records).
+routes = [
+  { pattern = "quarry.team", custom_domain = true },
+  { pattern = "www.quarry.team", custom_domain = true },
+]
+
+# Form-submission store. `database_id` comes from Terraform (`terraform output
+# -raw d1_database_id`) — fill it once after the first apply (not a secret).
+[[d1_databases]]
+binding = "DB"
+database_name = "marketing-site-form-submissions"
+database_id = "225a9b3f-3513-4690-81c2-a3f67e9814c2"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
+
+# Daily retention purge (src/worker.ts `scheduled`, src/lib/retention.ts):
+# deletes D1 rows past their date-based term — form submissions after 36
+# months, grievance events and throttle rows after thirteen. The counts land
+# in the Worker logs. docs/runbooks/data-retention.md. Environments inherit
+# `triggers`, so staging purges its own database on the same schedule.
+[triggers]
+crons = ["17 3 * * *"]
+
+# Site search (ADR-0021): the per-address budget on the on-demand /search
+# route, keyed on cf-connecting-ip by src/lib/search/ratelimit.ts. A Workers
+# Rate Limiting binding: `namespace_id` is any account-unique integer and
+# `period` is 10 or 60 seconds. 60 requests a minute covers debounced typing
+# with room to spare and stops a scripted loop. The zone's WAF rate-limit
+# rule is POST-only and stays as it is.
+[[ratelimits]]
+name = "SEARCH_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }
+
+# Grievance intake (ADR-0017) — non-secret identifiers. Environments do NOT
+# inherit `vars`, so the staging table below repeats them against its own log.
+# Notion ids are workspace-internal and useless without WORKER_NOTION_TOKEN; the user
+# ids are the grievance owner (Principal) and backup (Principal Delivery Manager).
+[vars]
+NOTION_GRIEVANCE_DATA_SOURCE_ID = "5e97e6e8-8f97-4bfa-a01f-ae8a3247d3d5" # Stakeholder Grievance Log
+NOTION_GRIEVANCE_OWNER_ID = "6db28400-36c4-485b-9053-9ff66429aa7b"
+NOTION_GRIEVANCE_BACKUP_ID = "75893ad5-b9ba-4996-b588-3f483775aac9"
+GRIEVANCE_FROM = "Quarry Concerns <concerns@quarry.team>"
+
+# Canonical URLs are slash-less (Astro `trailingSlash: 'never'`; build format
+# "directory" emits /route/index.html). Workers Static Assets defaults to
+# auto-trailing-slash, which 307s /services → /services/ — a canonical/sitemap/
+# internal-link mismatch. drop-trailing-slash serves /route directly with a 200
+# (and 307s /route/ → /route). The adapter injects `directory` into the emitted
+# dist/server/wrangler.json and merges this table; we only pin the mode here.
+[assets]
+html_handling = "drop-trailing-slash"
+# Every request reaches the Worker except the asset families that never carry
+# a policy: src/worker.ts adds a per-request CSP nonce to each HTML response
+# (ADR-0019). Negative patterns win; `*` matches across slashes; 100 max.
+# The prerendered search index (/search-index.json, ADR-0021) stays on the
+# asset path under the *.json rule; the /search route reads it through the
+# assets binding.
+run_worker_first = [
+  "/*",
+  "!/_astro/*", "!/logos/*", "!/og/*",
+  "!/*.png", "!/*.jpg", "!/*.jpeg", "!/*.webp", "!/*.avif", "!/*.svg", "!/*.ico",
+  "!/*.css", "!/*.js", "!/*.woff", "!/*.woff2",
+  "!/*.xml", "!/*.txt", "!/*.json", "!/*.webmanifest",
+]
+
+# ── Staging (ADR-0013: staging host + per-PR previews) ───────────────────────
+# Deploys as `quarry-web-staging` on staging.quarry.team with its own D1 so
+# test submissions never touch production data. `preview_urls` gives every
+# `wrangler versions upload` an ephemeral hash-prefixed workers.dev URL — the
+# per-PR preview mechanism. The staging hostname is kept out of search engines
+# by an edge header rule (X-Robots-Tag: noindex — Terraform-owned); preview
+# URLs get the same header from src/worker.ts.
+[env.staging]
+workers_dev = false
+preview_urls = true
+
+routes = [{ pattern = "staging.quarry.team", custom_domain = true }]
+
+# id from Terraform: `terraform output -raw d1_staging_database_id`.
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "marketing-site-form-submissions-staging"
+database_id = "1faf9424-49fd-40d3-a8a4-7d10df2e0c3c"
+migrations_dir = "migrations"
+
+[env.staging.observability]
+enabled = true
+
+# Search budget, staging (ADR-0021): its own namespace, same limits.
+[[env.staging.ratelimits]]
+name = "SEARCH_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
+
+# Staging mirrors into its own Notion log so the pipeline is testable end to
+# end before anything reaches the production register.
+[env.staging.vars]
+NOTION_GRIEVANCE_DATA_SOURCE_ID = "78e1900c-faa2-4e43-b769-050ac2b0c456" # Stakeholder Grievance Log (staging)
+NOTION_GRIEVANCE_OWNER_ID = "6db28400-36c4-485b-9053-9ff66429aa7b"
+NOTION_GRIEVANCE_BACKUP_ID = "75893ad5-b9ba-4996-b588-3f483775aac9"
+GRIEVANCE_FROM = "Quarry Concerns (staging) <concerns@quarry.team>"
+
+# Environments do NOT inherit the top-level `assets` table — repeat the HTML
+# handling mode and the Worker-first routing so staging serves identically.
+[env.staging.assets]
+html_handling = "drop-trailing-slash"
+# Every request reaches the Worker except the asset families that never carry
+# a policy: src/worker.ts adds a per-request CSP nonce to each HTML response
+# (ADR-0019). Negative patterns win; `*` matches across slashes; 100 max.
+# The prerendered search index (/search-index.json, ADR-0021) stays on the
+# asset path under the *.json rule; the /search route reads it through the
+# assets binding.
+run_worker_first = [
+  "/*",
+  "!/_astro/*", "!/logos/*", "!/og/*",
+  "!/*.png", "!/*.jpg", "!/*.jpeg", "!/*.webp", "!/*.avif", "!/*.svg", "!/*.ico",
+  "!/*.css", "!/*.js", "!/*.woff", "!/*.woff2",
+  "!/*.xml", "!/*.txt", "!/*.json", "!/*.webmanifest",
+]
+
+# Secrets are never committed and never set on the Worker by hand: they live in
+# the `staging` and `production` GitHub environments under these same WORKER_*
+# names, and every Deploy Web run ships them with the new version (`wrangler
+# deploy --secrets-file`; infra/README.md "Worker runtime secrets",
+# docs/runbooks/bootstrap.md §5):
+#   WORKER_TURNSTILE_SECRET             — server-side Turnstile verification (written by
+#                                         Terraform, infra/github.tf, like the grievance widget's).
+#                                         REQUIRED: without it a deployed build answers every form POST 503
+#   WORKER_FORM_SUBMISSIONS_IP_HASH_KEY — HMAC key for the stored client-address hash (any long random
+#                                         string, distinct from WORKER_GRIEVANCE_SIGNING_KEY); without it
+#                                         rows keep the address prefix only and the Worker logs an error
+#   WORKER_RESEND_API_KEY               — submission-notification email
+#   WORKER_FORM_SUBMISSIONS_NOTIFY_TO   — optional (default hello@quarry.team)
+#   WORKER_FORM_SUBMISSIONS_NOTIFY_FROM — optional (default "Quarry Site <noreply@quarry.team>")
+#   WORKER_FORM_SUBMISSIONS_WEBHOOK_URL — optional
+# Grievance intake (ADR-0017). Production builds run STRICT: without
+# WORKER_GRIEVANCE_SIGNING_KEY the form serves a 503, and a missing Turnstile
+# secret quarantines every submission. GRIEVANCE_STRICT = "0" (a var, so
+# unprefixed) opts out; the local e2e run passes it via `wrangler dev --var`.
+# Never set it on a deployed env.
+#   WORKER_TURNSTILE_GRIEVANCES_SECRET  — the invisible widget's secret (written by Terraform)
+#   WORKER_GRIEVANCE_SIGNING_KEY        — REQUIRED: HMAC key for the form token + IP hashing
+#                                         (any long random string)
+#   WORKER_NOTION_TOKEN                 — internal-integration token with insert access to the grievance log
+#   WORKER_GRIEVANCE_NOTIFY_TO          — optional (default concerns@quarry.team)
+#   WORKER_GRIEVANCE_NOTIFY_BACKUP_TO   — REQUIRED for the routing promise: the backup's OWN inbox, never
+#                                         the shared alias. A concern that involves the owner is emailed
+#                                         here and nowhere else; unset, no email goes out for it (logged
+#                                         as notify_skipped).
+# PUBLIC_TURNSTILE_SITE_KEY and PUBLIC_TURNSTILE_GRIEVANCES_SITE_KEY are
+# BUILD-time vars (baked by Astro), set in CI.

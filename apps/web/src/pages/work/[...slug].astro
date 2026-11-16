@@ -1,0 +1,328 @@
+---
+import { getCollection, render } from 'astro:content';
+import { Image, getImage } from 'astro:assets';
+import Base from '@/layouts/Base.astro';
+import Button from '@/components/Button.astro';
+import CaseCard from '@/components/CaseCard.astro';
+import ImageZoom from '@/components/ImageZoom.astro';
+import Prose from '@/components/Prose.astro';
+import Tag from '@/components/Tag.astro';
+import { ledger } from '@/lib/compliance';
+import { creditHtml } from '@/lib/credit';
+import { primaryCta, site } from '@/lib/site';
+import { disciplineHref } from '@/lib/work';
+
+export async function getStaticPaths() {
+  const cases = (await getCollection('cases')).filter((c) => !c.data.draft && !c.data.comingSoon);
+  return cases.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { data } = entry;
+const { Content } = await render(entry);
+
+// Per-page social image generated from the hero, cropped to the canonical
+// 1200×630 social aspect so Twitter/LinkedIn/Slack never letterbox or re-crop.
+const ogWidth = 1200;
+const ogHeight = 630;
+const ogImg = data.hero
+  ? (
+      await getImage({
+        src: data.hero,
+        width: ogWidth,
+        height: ogHeight,
+        fit: 'cover',
+        format: 'jpeg',
+        quality: 80,
+      })
+    ).src
+  : '/og/default.png';
+// The hero renders at up to 1240px; click-to-enlarge (ImageZoom) opens this
+// wider derivative so detail in charts and diagrams stays legible.
+const heroZoomWidth = data.hero ? Math.min(data.hero.width, 2400) : 0;
+const heroZoom = data.hero
+  ? await getImage({ src: data.hero, width: heroZoomWidth, format: 'webp' })
+  : undefined;
+// A `hero.svg` beside the entry replaces the raster hero on the case page and
+// is inlined, so its text is live (selectable, crisp, set in the site's fonts).
+// The raster `hero` still feeds the work cards and the social image.
+const heroSvgs = import.meta.glob<string>('../../content/cases/*/hero.svg', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const heroSvg = heroSvgs[`../../content/cases/${entry.id}/hero.svg`];
+const pageUrl = `${site.url}/work/${entry.id}`;
+const published = data.releasedDate.toISOString();
+const modified = data.updatedDate?.toISOString();
+const articleLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: data.title,
+  description: data.seo?.description ?? data.summary,
+  image: new URL(ogImg, site.url).href,
+  datePublished: published,
+  ...(modified ? { dateModified: modified } : {}),
+  author: { '@type': 'Organization', name: site.legalName, url: site.url },
+  publisher: { '@type': 'Organization', name: site.legalName, url: site.url },
+  mainEntityOfPage: pageUrl,
+};
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: site.url },
+    { '@type': 'ListItem', position: 2, name: 'Work', item: `${site.url}/work` },
+    { '@type': 'ListItem', position: 3, name: data.title, item: pageUrl },
+  ],
+};
+
+// "More work": 2–3 other published cases sharing a discipline, most recent
+// first; topped up with the most recent remaining cases when overlap is thin.
+const otherCases = (await getCollection('cases'))
+  .filter((c) => !c.data.draft && !c.data.comingSoon && c.id !== entry.id)
+  .sort((a, b) => b.data.releasedDate.getTime() - a.data.releasedDate.getTime());
+const related = otherCases.filter((c) =>
+  c.data.disciplines.some((d) => data.disciplines.includes(d)),
+);
+const moreWork = [...related, ...otherCases.filter((c) => !related.includes(c))].slice(0, 3);
+const meta = [
+  ['Client', data.client],
+  ['Role', data.role],
+  ['Duration', data.duration],
+  ['Team', data.team],
+].filter(([, v]) => v) as [string, string][];
+
+// Cases cited in the /compliance evidence ledger carry a regulated-environment
+// note pointing back at the record. Single source: src/lib/compliance.ts.
+const citation = ledger.find((e) => e.slug === entry.id);
+---
+
+<Base
+  title={data.seo?.title ?? data.title}
+  description={data.seo?.description ?? data.summary}
+  type="article"
+  image={ogImg}
+  imageAlt={data.heroAlt || data.title}
+  imageWidth={ogWidth}
+  imageHeight={ogHeight}
+  author={site.name}
+  publishedTime={published}
+  modifiedTime={modified}
+  jsonLd={[articleLd, breadcrumbLd]}
+>
+  <article>
+    <header class="section">
+      <div class="container">
+        <p class="eyebrow">
+          <a href="/work" class="text-inherit underline underline-offset-2">
+            Work
+          </a>{' '}
+          / {data.industry ?? data.client}
+        </p>
+        <h1 class="mt-3 max-w-[20ch] text-4xl">{data.title}</h1>
+        <p class="measure mt-4 text-lg text-(--color-text-muted)">{data.summary}</p>
+        {/* Discipline chips lead to the library view for that discipline. */}
+        <div class="mt-6 flex flex-wrap gap-2">
+          {data.disciplines.map((d) => (
+            <Tag discipline={d} href={disciplineHref(d)} />
+          ))}
+        </div>
+      </div>
+    </header>
+
+    {heroSvg && (
+      <div class="container">
+        <div
+          class="hero-chart-frame overflow-hidden rounded-xl border border-(--color-border)"
+          set:html={heroSvg}
+        />
+        {data.heroCredit && (
+          <p
+            class="mt-2 text-center text-xs text-(--color-text-muted) [&_a]:text-inherit [&_a]:underline [&_a]:underline-offset-2"
+            set:html={creditHtml(data.heroCredit)}
+          />
+        )}
+      </div>
+    )}
+
+    {data.hero && !heroSvg && (
+      <div class="container" data-zoom-scope>
+        <Image
+          class="w-full rounded-xl border border-(--color-border)"
+          src={data.hero}
+          alt={data.heroAlt}
+          widths={[800, 1240]}
+          sizes="100vw"
+          data-zoom-src={heroZoom?.src}
+          data-zoom-width={heroZoomWidth}
+        />
+        {data.heroCredit && (
+          <p
+            class="mt-2 text-center text-xs text-(--color-text-muted) [&_a]:text-inherit [&_a]:underline [&_a]:underline-offset-2"
+            set:html={creditHtml(data.heroCredit)}
+          />
+        )}
+      </div>
+    )}
+
+    <div class="container my-8 flex flex-wrap gap-8">
+      {meta.map(([k, v]) => (
+        <div>
+          <span class="block font-mono text-xs uppercase tracking-[0.08em] text-(--color-text-muted)">
+            {k}
+          </span>
+          <span class="text-lg font-semibold">{v}</span>
+        </div>
+      ))}
+    </div>
+
+    <div class="container">
+      <div class="my-12">
+        <p class="m-0 max-w-[32ch] font-display text-2xl font-normal leading-[1.3] tracking-[-0.01em] text-(--color-text) before:mb-4 before:block before:h-[3px] before:w-16 before:bg-(--color-accent) before:content-['']">
+          {
+            /* Kicker run-in. One ember moment per page: when a stat exists, the
+               numeral takes the accent and the kicker stays ink. */
+            data.outcome.kicker && (
+              <strong
+                class:list={[
+                  'font-display font-bold',
+                  data.outcome.stat ? 'text-(--color-text)' : 'text-(--color-accent-ink)',
+                ]}
+              >
+                {data.outcome.kicker}
+              </strong>
+            )
+          }{' '}
+          {data.outcome.headline}
+        </p>
+        {
+          /* Single-stat baseline row under the sentence. */
+          data.outcome.stat && data.outcome.supporting.length === 0 && (
+            <p class="m-0 mt-4 flex items-baseline gap-3">
+              <span class="font-display text-3xl leading-none text-(--color-accent-ink)">
+                {data.outcome.stat.value}
+              </span>{' '}
+              <span class="font-mono text-xs uppercase tracking-[0.08em] text-(--color-text-muted)">
+                {data.outcome.stat.label}
+              </span>
+            </p>
+          )
+        }
+        {
+          /* Numeral band — only when ≥2 genuine numerals exist. */
+          data.outcome.stat && data.outcome.supporting.length >= 1 && (
+            <ul
+              class:list={[
+                'surface-dark m-0 mt-8 grid list-none grid-cols-1 gap-6 rounded-xl border border-(--color-ink-panel-border) bg-(--color-ink-panel) px-12 py-8 sm:gap-0',
+                {
+                  'sm:grid-cols-2': data.outcome.supporting.length + 1 === 2,
+                  'sm:grid-cols-3': data.outcome.supporting.length + 1 === 3,
+                },
+              ]}
+              role="list"
+            >
+              <li>
+                <span class="block font-display text-3xl leading-[1.05] text-ember-500">
+                  {data.outcome.stat.value}
+                </span>
+                <span class="mt-2 block text-sm text-stone-300">{data.outcome.stat.label}</span>
+              </li>
+              {data.outcome.supporting.map((s) => (
+                <li class="border-t border-stone-700 pt-6 sm:border-t-0 sm:border-l sm:pl-8 sm:pt-0">
+                  <span class="block font-display text-3xl leading-[1.05] text-stone-25">
+                    {s.value}
+                  </span>
+                  <span class="mt-2 block text-sm text-stone-300">{s.label}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      </div>
+    </div>
+
+    <div data-zoom-scope>
+      <Prose class="container my-16 max-w-(--measure) text-lg">
+        <Content />
+      </Prose>
+    </div>
+    <ImageZoom />
+
+    {citation && (
+      <div class="container">
+        <aside
+          class="mb-8 mt-12 rounded-md border border-l-[3px] border-(--color-border) border-l-(--color-primary) bg-(--color-surface) px-6 py-4"
+          aria-label="Regulated environments"
+        >
+          <span class="font-mono text-xs uppercase tracking-[0.06em] text-(--color-primary)">
+            {citation.regime}
+          </span>
+          <p class="mt-2 text-sm text-(--color-text-muted)">
+            This engagement is cited on our compliance record.{' '}
+            <a href="/compliance" class="font-semibold">
+              How we deliver in regulated environments →
+            </a>
+          </p>
+        </aside>
+      </div>
+    )}
+
+    <div class="container">
+      <div class="border-t border-(--color-border) py-16 text-center">
+        <h2 class="mb-6 text-2xl">Have a problem worth this kind of attention?</h2>
+        <Button href={primaryCta.href} size="lg">
+          {primaryCta.label}
+        </Button>
+      </div>
+    </div>
+
+    {moreWork.length > 0 && (
+      <section class="container border-t border-(--color-border) pb-16 pt-12">
+        <h2 class="text-2xl">More work</h2>
+        <ul
+          role="list"
+          class="m-0 mt-8 grid list-none grid-cols-1 gap-6 p-0 min-[43.75rem]:grid-cols-3"
+        >
+          {moreWork.map((c) => (
+            <li>
+              <CaseCard entry={c} />
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </article>
+</Base>
+
+<style>
+  /* Residual: an inlined hero.svg is markup the template does not author, so its
+     sizing and label type are set here. Labels carry no style attributes (strict
+     CSP); colours on the art itself are presentation attributes in the file. */
+  .hero-chart-frame :global(svg) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .hero-chart-frame :global(text) {
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+  }
+  .hero-chart-frame :global(.hero-chart__note) {
+    font-size: 21px;
+    fill: var(--stone-300);
+    fill-opacity: 0.75;
+  }
+  .hero-chart-frame :global(.hero-chart__note--hot) {
+    fill: var(--ember-500);
+    fill-opacity: 0.85;
+  }
+  .hero-chart-frame :global(.hero-chart__zero) {
+    font-size: 30px;
+    fill: var(--stone-100);
+  }
+  .hero-chart-frame :global(.hero-chart__total) {
+    font-size: 44px;
+    fill: var(--stone-25);
+  }
+</style>

@@ -1,0 +1,225 @@
+/**
+ * tokens.css — the code half of the 1:1 design contract; the Figma Variables
+ * are the design half. Both derive from tokens.json.
+ *
+ * The block between the @generated markers is produced by
+ * packages/ui/src/build-tokens.ts from tokens.json — do not edit it by hand;
+ * edit tokens.json and run `pnpm --filter @quarry/ui build`. CI regenerates and
+ * fails if the committed file drifts (.github/workflows/ci.yml). Everything
+ * below the markers — fluid type scale, elevation, and the semantic aliases +
+ * dark-theme sets — is hand-authored design intent beyond raw token values.
+ */
+:root {
+  /* @generated:start — primitives derived from tokens.json; do not edit by hand */
+  /* Stone */
+  --stone-0: #ffffff;
+  --stone-25: #fafaf7;
+  --stone-50: #f4f4ef;
+  --stone-100: #e9e9e2;
+  --stone-200: #d6d6cc;
+  --stone-300: #b8b8ac;
+  --stone-400: #94948a;
+  --stone-500: #6e6e66;
+  --stone-600: #52524c;
+  --stone-700: #3a3a36;
+  --stone-800: #232320;
+  --stone-900: #141413;
+  --stone-950: #0b0b0a;
+  --ink: #0b0f1a;
+  --ink-soft: #3a3f4b;
+
+  /* Blue */
+  --blue-50: #eaf1ff;
+  --blue-100: #d0e0ff;
+  --blue-300: #6fa0f5;
+  --blue-500: #0c53c7;
+  --blue-600: #0a47ab;
+  --blue-700: #083a8c;
+
+  /* Ember */
+  --ember-500: #ff5a1f;
+  --ember-600: #e64a12;
+  --ember-700: #c2410c;
+
+  /* Discipline (categorical) — each also carries a `-tint` (pale chip background) and an `-ink` (text darkened to hold WCAG AA >=4.5:1 on that tint). */
+  --discipline-strategy: #7a0cc7;
+  --discipline-strategy-tint: #f3e8fb;
+  --discipline-strategy-ink: #6b21a8;
+  --discipline-design: #06a269;
+  --discipline-design-tint: #e2f4ed;
+  --discipline-design-ink: #065f46;
+  --discipline-engineering: #0c53c7;
+  --discipline-engineering-tint: #eaf1ff;
+  --discipline-engineering-ink: #1e40af;
+  --discipline-ecommerce: #ff680d;
+  --discipline-ecommerce-tint: #fdeadd;
+  --discipline-ecommerce-ink: #9a3412;
+  --discipline-data: #e99a01;
+  --discipline-data-tint: #fbf1dd;
+  --discipline-data-ink: #854d0e;
+
+  /* Status */
+  --status-success: #06a269;
+  --status-warning: #e99a01;
+  --status-danger: #c8341f;
+  --status-info: #0c53c7;
+
+  /* Type families — the `<name> fallback` faces are metric-matched local fallbacks (fontaine) that occupy identical space pre-swap, so there is zero font-swap CLS. They exist only in built output. */
+  --font-display:
+    'Fraunces Variable', 'Fraunces fallback', Fraunces, Georgia, 'Times New Roman', serif;
+  --font-text:
+    'Hanken Grotesk Variable', 'Hanken fallback', 'Hanken Grotesk', system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+  --font-mono:
+    'JetBrains Mono Variable', 'JetBrains fallback', 'JetBrains Mono', ui-monospace,
+    'SFMono-Regular', Menlo, monospace;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+  --space-10: 8rem;
+  --space-11: 10rem;
+  --space-12: 12.5rem;
+  /* Vertical rhythm for page sections (one side). Every full-width band (.section, ToolsSection, 404) pads with this so adjacent sections stack to a consistent, design-system gap. */
+  --space-section: clamp(3rem, 2rem + 5vw, 6rem);
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  --radius-full: 9999px;
+
+  /* Sizing / layout */
+  --container: 1200px;
+  --container-wide: 1320px;
+  --measure: 68ch;
+  /* Height of the sticky site header. Heroes that sit under the header, sticky rails, and the mobile menu's max-height offset by it. */
+  --header-height: 72px;
+
+  /* Motion — duration */
+  --dur-1: 150ms;
+  --dur-2: 250ms;
+  --dur-3: 400ms;
+  --dur-4: 600ms;
+  --dur-5: 900ms;
+
+  /* Motion — easing */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  /* @generated:end */
+
+  /* —— Fluid type scale (clamp: 360px → 1280px) —— */
+  /* 2xs is fixed: the uppercase mono chip label (discipline tags), set below
+     the fluid floor so a row of pills holds one line on a card. */
+  --text-2xs: 0.7rem;
+  --text-xs: clamp(0.75rem, 0.73rem + 0.1vw, 0.78rem);
+  --text-sm: clamp(0.84rem, 0.82rem + 0.12vw, 0.875rem);
+  --text-base: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+  --text-lg: clamp(1.13rem, 1.06rem + 0.32vw, 1.33rem);
+  --text-xl: clamp(1.32rem, 1.2rem + 0.5vw, 1.7rem);
+  --text-2xl: clamp(1.6rem, 1.4rem + 0.9vw, 2.2rem);
+  --text-3xl: clamp(2rem, 1.65rem + 1.5vw, 3rem);
+  --text-4xl: clamp(2.4rem, 1.9rem + 2.2vw, 4.2rem);
+  --text-5xl: clamp(2.9rem, 2.1rem + 3.6vw, 5.8rem);
+
+  /* —— Elevation (soft, warm; used sparingly) —— */
+  --shadow-sm: 0 1px 2px rgba(11, 15, 26, 0.06);
+  --shadow-md: 0 6px 24px -8px rgba(11, 15, 26, 0.12);
+  --shadow-lg: 0 24px 64px -16px rgba(11, 15, 26, 0.18);
+
+  /* —— Semantic aliases (light, default) —— */
+  color-scheme: light;
+  --color-bg: var(--stone-25);
+  --color-surface: var(--stone-0);
+  --color-surface-2: var(--stone-50);
+  --color-text: var(--ink);
+  --color-text-muted: var(--stone-500);
+  --color-border: var(--stone-200);
+  --color-border-strong: var(--stone-300);
+  --color-primary: var(--blue-500);
+  --color-primary-hover: var(--blue-600);
+  --color-primary-contrast: #ffffff;
+  --color-accent: var(--ember-500);
+  /* Accent used as TEXT — darkened for AA contrast on light backgrounds. */
+  --color-accent-ink: var(--ember-700);
+  --color-focus: var(--blue-500);
+
+  /* Intentional dark "ink panel" blocks (footer, feature/stat bands): dark in
+     BOTH modes, and mode-aware so they still separate from the page in dark. */
+  --color-ink-panel: var(--stone-950);
+  --color-ink-panel-border: transparent;
+  /* Brand CTA band: fixed brand blue in both modes (always white text). */
+  --color-cta: var(--blue-600);
+  --color-cta-hover: var(--blue-700);
+}
+
+/* —— Dark theme alias set —— shared by system-preference, explicit toggle,
+   and a `dark()` helper would be nice, but CSS has no mixins, so the set is
+   applied to each selector below. */
+
+/* (1) System preference — unless the user has explicitly chosen light. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --color-bg: var(--stone-950);
+    --color-surface: var(--stone-900);
+    --color-surface-2: var(--stone-800);
+    --color-text: var(--stone-25);
+    --color-text-muted: var(--stone-300);
+    --color-border: var(--stone-700);
+    --color-border-strong: var(--stone-600);
+    --color-primary: var(--blue-300);
+    --color-primary-hover: var(--blue-100);
+    --color-primary-contrast: var(--ink);
+    --color-accent: var(--ember-500);
+    --color-accent-ink: var(--ember-500);
+    --color-focus: var(--blue-300);
+    --color-ink-panel: var(--stone-900);
+    --color-ink-panel-border: var(--stone-700);
+  }
+}
+
+/* (2) Explicit user choice via the theme toggle (overrides system pref). */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: var(--stone-950);
+  --color-surface: var(--stone-900);
+  --color-surface-2: var(--stone-800);
+  --color-text: var(--stone-25);
+  --color-text-muted: var(--stone-300);
+  --color-border: var(--stone-700);
+  --color-border-strong: var(--stone-600);
+  --color-primary: var(--blue-300);
+  --color-primary-hover: var(--blue-100);
+  --color-primary-contrast: var(--ink);
+  --color-accent: var(--ember-500);
+  --color-accent-ink: var(--ember-500);
+  --color-focus: var(--blue-300);
+  --color-ink-panel: var(--stone-900);
+  --color-ink-panel-border: var(--stone-700);
+}
+
+/* (3) Fixed-dark context for intentional dark blocks, regardless of page theme.
+   Re-scopes the semantic aliases to dark so nested components Just Work. */
+.surface-dark {
+  color-scheme: dark;
+  --color-bg: var(--color-ink-panel);
+  --color-surface: var(--stone-800);
+  --color-surface-2: var(--stone-700);
+  --color-text: var(--stone-25);
+  --color-text-muted: var(--stone-300);
+  --color-border: var(--stone-700);
+  --color-border-strong: var(--stone-600);
+  --color-primary: var(--blue-300);
+  --color-primary-hover: var(--blue-100);
+  --color-primary-contrast: var(--ink);
+  --color-focus: var(--blue-300);
+}

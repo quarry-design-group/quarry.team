@@ -1,0 +1,38 @@
+---
+/** StatBand — firm track-record proof. Display numerals tinted per discipline. */
+import type { Discipline, Stat } from '@/lib/site';
+interface Props {
+  items: Stat[];
+  class?: string;
+}
+const { items, class: cls } = Astro.props;
+
+/* Discipline tint lives on the top border (decorative); the numeral itself
+   stays high-contrast --color-text for WCAG AA. The tone maps to a utility
+   (not an inline style) so the strict CSP needs no style attributes
+   (ADR-0015); one entry per Discipline value. */
+const tones: Record<Discipline, string> = {
+  strategy: 'border-t-(--discipline-strategy)',
+  design: 'border-t-(--discipline-design)',
+  engineering: 'border-t-(--discipline-engineering)',
+  ecommerce: 'border-t-(--discipline-ecommerce)',
+  data: 'border-t-(--discipline-data)',
+};
+---
+
+<ul
+  class:list={[
+    'list-none m-0 p-0 grid grid-cols-1 min-[35rem]:grid-cols-2 min-[57.5rem]:grid-cols-3 gap-x-8 gap-y-6',
+    cls,
+  ]}
+  role="list"
+>
+  {items.map((s) => (
+    <li class:list={['border-t-2 pt-4', tones[s.tone]]}>
+      <span class="block font-display font-[480] text-4xl leading-none tracking-[-0.02em] text-(--color-text)">
+        {s.value}
+      </span>
+      <span class="block mt-2 text-sm text-(--color-text-muted)">{s.label}</span>
+    </li>
+  ))}
+</ul>

@@ -1,0 +1,41 @@
+---
+title: 'Engineering a modern corporate sustainability platform while maintaining legacy content for WM'
+client: 'WM (Waste Management)'
+summary: 'We engineered WM’s modern sustainability platform for their anniversary milestone — performant, on-brand, and preserving legacy content at $0 added infra cost.'
+disciplines: ['design', 'engineering']
+industry: 'Environmental Services'
+outcome:
+  kicker: 'On schedule.'
+  headline: "A dual-stack architecture shipped for WM's anniversary milestone — every legacy URL intact, no added budget."
+releasedDate: 2024-12-05
+hero: ./hero.jpg
+heroAlt: 'Fleet of green WM garbage trucks lined up across a paved lot under a cloudy sky'
+featured: true
+order: 8
+---
+
+## The Challenge
+
+WM’s sustainability team initiated a microsite redesign project to coincide with their anniversary milestone in 2023. The initial scope was set as a redesign of sustainability.wm.com developed on Next.js to create a more modern, performant experience.
+
+Midway through development, a new requirement emerged: legacy pages needed to maintain their existing URLs on the same subdomain. These legacy pages were on CorePHP but contained critical historical content referenced across WM’s digital properties and the project budget could not support a change order to migrate these pages to the Next.js project. The technical challenge involved maintaining both systems on a single domain while working within the original timeline and budget constraints.
+
+## The Solution
+
+Quarry developed an innovative dual-stack architecture that would serve both old and new content seamlessly to visitors.
+
+The solution centered on some creative nginx config that routed requests between the legacy CorePHP and the new Next.js framework depending on the requested path. When visitors accessed the site, they would experience a smooth, consistent journey whether they were viewing fresh content or archived materials.
+
+Implementation involved:
+
+- Nginx server configuration to handle URL-based routing between systems
+- Next.js application deployment in WM’s AWS environment
+- CI/CD pipeline implementation for automated deployments
+- DNS configuration changes coordinated with WM’s technology team to cutover when the next-gen site was ready to ship
+- Documentation for WM’s team on managing both systems
+
+![Laptop mockup of WM sustainability site homepage with green garbage trucks and 'Always Working for a Sustainable Tomorrow' headline](./image-1.png) ![Laptop mockup of WM Sustainability Ambitions in Action section with worker photos and greenhouse gas reduction stats](./image-2.png) ![Laptop mockup of WM 'Energy is Renewable' page showing a worker at a renewable natural gas facility with impact metrics](./image-3.png) ![Person holding a laptop showing WM Sustainability insights page with Company, Environmental, Social and Governance topic tiles](./image-4.png) ![Laptop mockup of WM Sustainability Disclosures page promoting the 2023 Sustainability Report over an aerial trucks photo](./image-5.png)
+
+## The Results
+
+The project launched on schedule for WM’s anniversary milestone. The new system successfully maintained all legacy URLs while delivering the redesigned site, requiring no additional budget despite the expanded scope. The sustainability team received a modern, high-performance website that preserved their historical content without disruption to existing links or resources.

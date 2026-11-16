@@ -1,0 +1,209 @@
+---
+/**
+ * Base layout — document shell, SEO, structured data, skip-link, header,
+ * footer, and the console recruitment easter egg. Every page renders through
+ * this. Performance: zero render-blocking JS; fonts self-hosted; every page's
+ * CSS inlined (astro.config inlineStylesheets: 'always' — the rationale sits
+ * beside that setting).
+ */
+import '@/styles/global.css';
+import Header from '@/components/Header.astro';
+import Footer from '@/components/Footer.astro';
+import ConsoleSignature from '@/components/ConsoleSignature.astro';
+import { getCollection } from 'astro:content';
+import { site, socials, linkedinUrl, type SeoProps } from '@/lib/site';
+import { tokens } from '@quarry/ui/tokens';
+// The body/text font subset, preloaded so its swap happens while the HTML is
+// still streaming rather than after CSS discovery. LCP attributes text to the
+// webfont's swap repaint (the metric-matched fontaine fallbacks make the swap
+// zero-CLS but not zero-repaint), and the LCP element on key pages is body
+// text — a late Hanken reads as a ~1s LCP penalty on throttled mobile.
+// Only this one: preloading every family competes with the HTML document for
+// early bandwidth and pushes FCP out instead. ?url resolves the hashed
+// /_astro asset path at build time.
+import hankenWoff2 from '@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2?url';
+// The mono subset, also preloaded: its fontaine fallback is built from a
+// PROPORTIONAL system font (Georgia/Arial), so mono text — the eyebrow (on
+// nearly every page) and the case-page discipline tags — reflows ~24% narrower
+// when JetBrains Mono swaps in, re-wrapping the pill row and shifting content
+// below it (a stable ~0.11 CLS on case pages). Preloading collapses the swap
+// window so the mono text lays out final-width from first paint. Small subset
+// (~40 KB), genuinely above the fold.
+import monoWoff2 from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url';
+
+type Props = SeoProps & { class?: string };
+
+const {
+  title,
+  titleAbsolute = false,
+  description = site.description,
+  image = '/og/default.png',
+  imageAlt,
+  imageWidth = 1200,
+  imageHeight = 630,
+  noindex = false,
+  type = 'website',
+  author,
+  publishedTime,
+  modifiedTime,
+  jsonLd = [],
+  class: className,
+} = Astro.props;
+
+const pageTitle = title
+  ? titleAbsolute
+    ? title
+    : `${title} — ${site.name}`
+  : `${site.name} — Elite product design & engineering team`;
+// Social cards keep the full brand tagline; only the SERP title is truncated.
+const ogTitle = title ? pageTitle : `${site.name} — ${site.tagline}`;
+// Page-level absolute URLs (canonical, og:url, og:image) follow the BUILD's
+// origin (Astro.site ← SITE_URL), so staging/preview deploys reference their
+// own host and are unfurl-testable before cutover — og:image pointing at the
+// production apex 404s against the legacy site until DNS flips. JSON-LD
+// entity @ids below stay pinned to site.url on purpose: the entity is the
+// same organization regardless of which host served the page.
+const origin = (Astro.site ?? new URL(site.url)).origin;
+const canonical = new URL(Astro.url.pathname, origin).href.replace(/\/$/, '') || origin;
+const ogImage = new URL(image, origin).href;
+const ogImageAlt = imageAlt ?? `${site.name} — ${site.tagline}`;
+// Browser chrome follows the OS color scheme through the media attributes (each
+// theme's page background); an explicit toggle leaves it on the OS value.
+const themeColor = {
+  light: tokens.color.stone['25'].$value.toLowerCase(),
+  dark: tokens.color.stone['950'].$value.toLowerCase(),
+};
+
+// Headcount computed from the team collection at build — never hardcoded.
+const teamCount = (await getCollection('team')).length;
+
+const orgLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  // Professional-services signal without re-typing the org (PO ruling).
+  additionalType: 'https://schema.org/ProfessionalService',
+  '@id': `${site.url}/#org`,
+  name: site.legalName,
+  alternateName: site.name,
+  url: site.url,
+  logo: { '@type': 'ImageObject', url: `${site.url}/icon-512.png` },
+  description: site.description,
+  slogan: site.tagline,
+  telephone: site.phone,
+  foundingDate: String(site.founded),
+  founder: { '@type': 'Person', name: 'Brendan Binger', jobTitle: 'Principal' },
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: site.address.street,
+    addressLocality: site.address.city,
+    addressRegion: site.address.region,
+    postalCode: site.address.postalCode,
+    addressCountry: site.address.country,
+  },
+  areaServed: 'Worldwide',
+  numberOfEmployees: { '@type': 'QuantitativeValue', value: teamCount },
+  knowsAbout: [
+    'product strategy',
+    'UX/UI design',
+    'full-stack engineering',
+    'e-commerce engineering',
+    'data engineering',
+    'AI & LLM engineering',
+  ],
+  // Memberships / partner programs (not awards).
+  memberOf: [
+    { '@type': 'Organization', name: '1% for the Planet' },
+    { '@type': 'Organization', name: 'Shopify Partners' },
+    { '@type': 'Organization', name: 'Hyvä Bronze Partner' },
+  ],
+  // Single source: the socials list + the LinkedIn company page.
+  sameAs: [...new Set([...socials.map((s) => s.href), linkedinUrl])],
+};
+const siteLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: site.name,
+  url: site.url,
+  publisher: { '@id': `${site.url}/#org` },
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>
+      /* No-FOUC theme init: apply the stored theme before first paint. When
+         nothing is stored, the OS preference (prefers-color-scheme) is the CSS
+         default. See ThemeToggle.astro + @quarry/ui tokens.css. */
+      (() => {
+        try {
+          const t = localStorage.getItem('theme');
+          if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+        } catch {
+          /* ignore */
+        }
+      })();
+    </script>
+    <link rel="preload" href={hankenWoff2} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={monoWoff2} as="font" type="font/woff2" crossorigin />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="author" content={author ?? site.name} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content={themeColor.light} />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content={themeColor.dark} />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="sitemap" type="application/xml" href="/sitemap-index.xml" />
+    <link rel="alternate" type="application/rss+xml" title="Quarry Insights" href="/rss.xml" />
+
+    <!-- Open Graph / Twitter -->
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content={ogTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:alt" content={ogImageAlt} />
+    <meta property="og:image:width" content={String(imageWidth)} />
+    <meta property="og:image:height" content={String(imageHeight)} />
+    {type === 'article' && publishedTime && (
+      <meta property="article:published_time" content={publishedTime} />
+    )}
+    {type === 'article' && modifiedTime && (
+      <meta property="article:modified_time" content={modifiedTime} />
+    )}
+    {type === 'article' && author && <meta property="article:author" content={author} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={ogTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
+
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(orgLd)}></script>
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(siteLd)}></script>
+    {jsonLd.map((ld) => (
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(ld)}></script>
+    ))}
+
+    <slot name="head" />
+  </head>
+  <body class={className}>
+    <a class="skip-link" href="#main">
+      Skip to content
+    </a>
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+    <ConsoleSignature />
+  </body>
+</html>

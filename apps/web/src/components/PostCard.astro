@@ -1,0 +1,62 @@
+---
+/**
+ * PostCard — the blog post card (hero, category/date kicker, clamped title +
+ * description). Shared by the Insights index grid and the "Related reading"
+ * block on post pages, so the two surfaces can never drift. Renders the card
+ * anchor only; callers own the list/grid wrapper.
+ */
+import { Image } from 'astro:assets';
+import type { CollectionEntry } from 'astro:content';
+import { formatDate } from '@/lib/dates';
+
+interface Props {
+  entry: CollectionEntry<'posts'>;
+  /**
+   * Mark this card's hero as the LCP image: load it eagerly AND with
+   * fetchpriority="high" so it wins the bandwidth race against sibling cards.
+   * Set on the single first card of a grid — every other card lazy-loads, so
+   * the one image that decides LCP isn't serialized behind five it doesn't need.
+   */
+  priority?: boolean;
+  /** Heading level for the post title — h3 under a section heading. */
+  heading?: 'h2' | 'h3';
+}
+const { entry, priority = false, heading: Heading = 'h2' } = Astro.props;
+const { data } = entry;
+---
+
+<a
+  class="group flex h-full flex-col overflow-clip rounded-lg border border-(--color-border) bg-(--color-surface) transition-[border-color,transform] duration-150 ease-out hover:-translate-y-[3px] hover:border-(--color-border-strong)"
+  href={`/blog/${entry.id}`}
+>
+  <div class="relative aspect-video overflow-clip bg-(--color-surface-2)">
+    {data.hero ? (
+      <Image
+        class="absolute inset-0 block size-full object-cover transition-transform duration-400 ease-out group-hover:scale-[1.04]"
+        src={data.hero}
+        alt={data.heroAlt}
+        widths={[400, 800]}
+        sizes="(min-width: 900px) 380px, 100vw"
+        loading={priority ? 'eager' : 'lazy'}
+        fetchpriority={priority ? 'high' : undefined}
+      />
+    ) : (
+      <span
+        class="absolute inset-0 block bg-[linear-gradient(135deg,var(--color-surface-2),var(--color-surface))]"
+        aria-hidden="true"
+      />
+    )}
+  </div>
+  <div class="flex flex-col gap-2 p-6">
+    <p class="flex items-center gap-3 font-mono text-xs tracking-[0.06em] uppercase text-(--color-text-muted)">
+      {data.category && <span class="text-(--color-primary)">{data.category}</span>}
+      <time datetime={data.publishedDate.toISOString()}>
+        {formatDate(data.publishedDate, 'short')}
+      </time>
+    </p>
+    <Heading class="line-clamp-2 text-xl leading-[1.2]">{data.title}</Heading>
+    <p class="line-clamp-3 min-h-[calc(3*1.5em)] text-sm text-(--color-text-muted)">
+      {data.description}
+    </p>
+  </div>
+</a>

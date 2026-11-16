@@ -1,0 +1,54 @@
+---
+import { getCollection } from 'astro:content';
+import { getImage } from 'astro:assets';
+import Base from '@/layouts/Base.astro';
+import PostCard from '@/components/PostCard.astro';
+const posts = (await getCollection('posts'))
+  .filter((p) => !p.data.draft)
+  .sort((a, b) => b.data.publishedDate.getTime() - a.data.publishedDate.getTime());
+// The first card's cover is this page's LCP element. Preload it (with the
+// exact srcset/sizes the <Image> renders) so the fetch starts with the HTML
+// instead of after layout — same derivatives PostCard requests, so nothing
+// extra ships.
+const lcpHero = posts[0]?.data.hero
+  ? await getImage({ src: posts[0].data.hero, widths: [400, 800] })
+  : undefined;
+---
+
+<Base
+  title="Insights: product, engineering, data & craft"
+  description="Field notes from a senior product team — honest takes on engineering, design, data, and the business of building digital products well. No fluff, no funnel."
+>
+  {lcpHero && (
+    <link
+      slot="head"
+      rel="preload"
+      as="image"
+      imagesrcset={lcpHero.srcSet.attribute}
+      imagesizes="(min-width: 900px) 380px, 100vw"
+      fetchpriority="high"
+    />
+  )}
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Insights</p>
+      <h1 class="mt-3 text-4xl">What we’ve learned, written down.</h1>
+      {posts.length > 0 ? (
+        <ul
+          class="m-0 mt-12 grid list-none grid-cols-1 gap-8 p-0 sm:grid-cols-2 min-[61.25rem]:grid-cols-3"
+          role="list"
+        >
+          {posts.map((p, i) => (
+            <li>
+              <PostCard entry={p} priority={i === 0} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="mt-8 text-(--color-text-muted)">
+          Articles are being migrated. Check back shortly.
+        </p>
+      )}
+    </div>
+  </section>
+</Base>

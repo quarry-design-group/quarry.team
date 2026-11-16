@@ -1,0 +1,282 @@
+/**
+ * global.css — the single style entry for the site.
+ * Order: Tailwind → design tokens → @theme bridge → fonts → base/reset.
+ * Components author their own scoped styles using the CSS custom properties
+ * from tokens.css. Tailwind provides layout/utility convenience.
+ */
+@import 'tailwindcss';
+
+/* Design tokens (the code half of the 1:1 contract). */
+@import '@quarry/ui/tokens.css';
+
+/* Self-hosted variable fonts (subset, swap). */
+@import '@fontsource-variable/fraunces';
+/* Italic axis of the same family — the hero's third headline line is set in
+   Fraunces italic, and `font-synthesis: none` (below) forbids faux italics. */
+@import '@fontsource-variable/fraunces/wght-italic.css';
+@import '@fontsource-variable/hanken-grotesk';
+/* Italic axis of the text family — emphasis in body copy (`_…_` in MDX) sets in
+   true Hanken italics under `font-synthesis: none`. */
+@import '@fontsource-variable/hanken-grotesk/wght-italic.css';
+@import '@fontsource-variable/jetbrains-mono';
+
+/* Register the tokens as theme values so Tailwind emits the matching utilities
+   (bg-stone-25, text-ink, font-display, text-3xl, rounded-lg, ease-out, …),
+   each pointing at the token variable. `inline` bakes that var(--…) straight
+   into every utility, keeping tokens.css the one place the values live. Tokens
+   whose name already matches the theme namespace (--font-*, --text-*,
+   --radius-*, --shadow-*, --ease-*) map to themselves: the utility reads the
+   token, which tokens.css defines at :root.
+   (Semantic, theme-swapping colors — --color-bg, --color-surface, … — are used
+   straight from markup as bg-(--color-surface); they are not bridged here.) */
+@theme inline {
+  --color-stone-0: var(--stone-0);
+  --color-stone-25: var(--stone-25);
+  --color-stone-50: var(--stone-50);
+  --color-stone-100: var(--stone-100);
+  --color-stone-200: var(--stone-200);
+  --color-stone-300: var(--stone-300);
+  --color-stone-400: var(--stone-400);
+  --color-stone-500: var(--stone-500);
+  --color-stone-600: var(--stone-600);
+  --color-stone-700: var(--stone-700);
+  --color-stone-800: var(--stone-800);
+  --color-stone-900: var(--stone-900);
+  --color-stone-950: var(--stone-950);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-blue-50: var(--blue-50);
+  --color-blue-100: var(--blue-100);
+  --color-blue-300: var(--blue-300);
+  --color-blue-500: var(--blue-500);
+  --color-blue-600: var(--blue-600);
+  --color-blue-700: var(--blue-700);
+  --color-ember-500: var(--ember-500);
+  --color-ember-600: var(--ember-600);
+
+  --font-display: var(--font-display);
+  --font-text: var(--font-text);
+  --font-mono: var(--font-mono);
+
+  /* The namespace reset drops Tailwind's default sizes AND their
+     --text-*--line-height pairs, so text-* utilities set font-size only and
+     line-height inherits (body 1.6 / heading 1.06) — the token scale's
+     established consumption model. */
+  --text-*: initial;
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+  --text-3xl: var(--text-3xl);
+  --text-4xl: var(--text-4xl);
+  --text-5xl: var(--text-5xl);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+}
+
+/* ——————————————————————————————— base ———————————————————————————————
+   Tailwind Preflight (from the `tailwindcss` import above) supplies the reset —
+   box-sizing, zeroed margins, block/fluid media, form controls inheriting type.
+   This layer adds the site's own element defaults on top: heading/link
+   typography, focus ring, reduced-motion, the skip link. It sits in @layer base
+   so those defaults yield to utilities — an unlayered `h1..h4 { margin: 0 }`
+   would out-cascade every layered `mt-*` on a heading (unlayered beats layered
+   before specificity is even considered). */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Lists keep their markers and indent. Preflight strips both from every
+     <ul> and <ol>, which made a plain list silently wrong until someone
+     noticed; here the browser default is the default again, and a layout
+     list opts out visibly with `list-none p-0` (plus role="list", which
+     keeps list semantics in Safari once the markers are gone). */
+  ul {
+    list-style: disc;
+  }
+  ol {
+    list-style: decimal;
+  }
+  ul,
+  ol {
+    padding-inline-start: 1.25em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      /* Delays must collapse along with durations: entrance choreography uses
+       `both` fill, so during a delay the element sits at its from-state
+       (opacity 0) — without this, reduced-motion users get an invisible-
+       then-popping page instead of an instant one. */
+      animation-delay: 0.001ms !important;
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-delay: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-text);
+    font-size: var(--text-base);
+    line-height: 1.6;
+    font-synthesis: none;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 460;
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  a {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  /* Links inside running text need a non-color distinction from the copy
+   around them (WCAG 1.4.1; axe link-in-text-block). Underline every
+   in-paragraph link; standalone interactive chrome (nav, cards, buttons)
+   is exempt by not living inside a <p>. */
+  p a {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.15em;
+  }
+
+  /* Beyond Preflight (which fluidifies only img/video): inline SVG and
+     <picture> participate in fluid layout the same way. */
+  picture,
+  svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Visible, consistent focus for every interactive element. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Accessible skip-link. (Visually-hidden text uses Tailwind's sr-only.) */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    background: var(--color-primary);
+    color: var(--color-primary-contrast);
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+  }
+  .skip-link:focus {
+    left: 1rem;
+    top: 1rem;
+  }
+}
+
+/* `container` collides with Tailwind's built-in container utility, whose
+   per-breakpoint max-widths (640…1536px) would beat a components-layer rule
+   and abandon the 1200px token cap on wide viewports. @utility REPLACES the
+   built-in, so `container` resolves to the token-backed shell everywhere. */
+@utility container {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--space-5);
+  @media (min-width: 48rem) {
+    padding-inline: var(--space-6);
+  }
+}
+
+/* ——————————————————————————————— shared primitives ———————————————————————————————
+   @layer components for the same reason as the base layer: these are shared
+   vocabulary classes that per-element utilities must be able to override
+   (components < utilities in Tailwind's layer order). */
+@layer components {
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+  }
+
+  /* A heading/intro row that carries a marquee's pause control (<MarqueePause>)
+   at its trailing end, so the control shares existing chrome instead of eating
+   the carousel's width. The leading label keeps its own margins. */
+  .marquee-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+  /* Zero-JS marquee pause: a checked <MarqueePause> anywhere inside a
+   [data-marquee-scope] wrapper sets --lw-play, which every marquee in
+   that scope inherits. Placement stays page-side; the wiring lives here once. */
+  [data-marquee-scope] {
+    --lw-play: running;
+  }
+  [data-marquee-scope]:has(.marquee-pause__input:checked) {
+    --lw-play: paused;
+  }
+
+  .section {
+    /* Site-wide band rhythm — tokenized so every page stacks sections the
+     same way (was a raw, much larger clamp that only /compliance exposed). */
+    padding-block: var(--space-section);
+  }
+
+  .measure {
+    max-width: var(--measure);
+  }
+
+  /* Rendered markdown bodies (posts, cases, roles, policies) share one list
+     rhythm; the markers themselves come from the base layer. */
+  .prose :where(ul, ol) {
+    margin-block: var(--space-4);
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .surface-dark {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+}

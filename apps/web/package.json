@@ -23,15 +23,15 @@
     "preview:worker": "pnpm db:migrate:local && wrangler dev -c dist/server/wrangler.json --port 8788 --show-interactive-dev-session=false --var GRIEVANCE_STRICT:0"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.4.7",
+    "@astrojs/cloudflare": "^14.4.9",
     "@astrojs/mdx": "^8.1.5",
     "@astrojs/rss": "^4.0.19",
-    "@astrojs/sitemap": "^3.7.4",
+    "@astrojs/sitemap": "^3.7.6",
     "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource-variable/hanken-grotesk": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@quarry/ui": "workspace:*",
-    "astro": "^7.4.11",
+    "astro": "^7.4.13",
     "cobe": "^2.0.1",
     "minisearch": "^7.2.0",
     "sharp": "^0.35.5",
@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "@astrojs/markdown-remark": "^7.3.8",
+    "@astrojs/markdown-remark": "^7.3.10",
     "@emnapi/runtime": "^1.11.3",
     "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^24",
@@ -48,6 +48,6 @@
     "tailwindcss": "^4.3.5",
     "typescript": "^6.0.3",
     "vitest": "^5.1.1",
-    "wrangler": "^4.162.0"
+    "wrangler": "^4.166.0"
   }
 }
